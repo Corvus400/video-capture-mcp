@@ -1,0 +1,21 @@
+name: update-homebrew
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  update-homebrew:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch tap update
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          gh workflow run update-formula.yml \
+            --repo Corvus400/homebrew-video-capture-mcp \
+            -f version="${RELEASE_TAG}"
