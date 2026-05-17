@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.mov
+*.mp4
+frames/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+*.egg-info/
+.playwright-mcp/
+*.normalized-*.mov
+*.normalized-*.mp4
+sessions/

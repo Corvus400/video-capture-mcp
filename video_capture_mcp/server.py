@@ -1,0 +1,205 @@
+from __future__ import annotations
+
+import asyncio
+from typing import Any
+
+from mcp.server.fastmcp import FastMCP
+
+from video_capture_mcp.extractor import extract_frames as extract_video_frames
+from video_capture_mcp.paths import default_output_root
+from video_capture_mcp.pointer import move_sequence as move_pointer_interpolated_sequence
+from video_capture_mcp.pointer import move_pointer as move_pointer_once
+from video_capture_mcp.session import Session
+from video_capture_mcp.window import get_window_region as get_app_window_region
+
+
+mcp = FastMCP("video_capture")
+_session = Session()
+
+
+@mcp.tool()
+async def start_recording(
+    target: str,
+    duration_seconds: float | None = None,
+    output_path: str | None = None,
+    options: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Start recording a target screen.
+
+    For macOS browser or desktop-app debugging, prefer
+    start_app_window_recording so the target app's visible window is checked and
+    only that window region is recorded. Use target="macos" here only when a
+    full desktop recording is intentionally needed or when options.region is
+    already known.
+    """
+    return await _session.start_recording(target, output_path, duration_seconds, options)
+
+
+@mcp.tool()
+async def stop_recording(session_id: str) -> dict[str, Any]:
+    """Stop a running recording session."""
+    return await _session.stop_recording(session_id)
+
+
+@mcp.tool()
+async def list_active_sessions() -> dict[str, list[dict[str, Any]]]:
+    """List active recording sessions."""
+    return _session.list_active_sessions()
+
+
+@mcp.tool()
+async def cleanup_stale_processes() -> dict[str, list[dict[str, Any]]]:
+    """Clean up recording processes left by a dead previous server process."""
+    return await _session.cleanup_stale_processes()
+
+
+@mcp.tool()
+async def move_pointer(x: float, y: float) -> dict[str, float]:
+    """Move the macOS pointer without clicking.
+
+    Use this for hover-only desktop checks when Computer Use drag would send a
+    mouse-up and might activate the target.
+    """
+    return move_pointer_once(x, y)
+
+
+@mcp.tool()
+async def hover_sequence(
+    points: list[Any],
+    hold_seconds: float = 0.5,
+    app_name: str | None = None,
+    steps_per_segment: int = 12,
+    step_delay_seconds: float = 0.02,
+) -> dict[str, Any]:
+    """Move the macOS pointer through hover/unhover points without clicking.
+
+    This is the preferred hover-only fallback for canvas-style or inaccessible
+    web pages where Playwright cannot target DOM elements. Pass app_name for
+    browser/app checks so the target app is activated immediately before the
+    hover sequence. It posts only mouse-move events and does not click.
+    """
+    active_window = None
+    if app_name:
+        active_window = await get_app_window_region(app_name, activate=True)
+    result = await move_pointer_interpolated_sequence(
+        points,
+        hold_seconds=hold_seconds,
+        steps_per_segment=steps_per_segment,
+        step_delay_seconds=step_delay_seconds,
+    )
+    if active_window is not None:
+        result["active_window"] = active_window
+    return result
+
+
+@mcp.tool()
+async def get_window_region(
+    app_name: str,
+    padding: int = 0,
+    min_visible_ratio: float = 0.8,
+    activate: bool = True,
+) -> dict[str, Any]:
+    """Return the visible front-window region for a macOS app.
+
+    Call this before macOS app/browser recording to verify the target window is
+    actually on screen and active. If visible=false, reposition the window
+    before recording.
+    """
+    return await get_app_window_region(
+        app_name,
+        padding=padding,
+        min_visible_ratio=min_visible_ratio,
+        activate=activate,
+    )
+
+
+@mcp.tool()
+async def start_app_window_recording(
+    app_name: str,
+    duration_seconds: float,
+    output_path: str | None = None,
+    padding: int = 0,
+    min_visible_ratio: float = 0.8,
+    options: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Start recording only the visible front-window region of a macOS app.
+
+    Preferred for Chrome/Safari/desktop-app debugging. It first activates the
+    target app, verifies the target front window is sufficiently visible, then
+    records only that visible region via screencapture -R instead of recording
+    the full desktop.
+    """
+    window_region = await get_app_window_region(
+        app_name,
+        padding=padding,
+        min_visible_ratio=min_visible_ratio,
+        activate=True,
+    )
+    if not window_region["visible"]:
+        return {
+            "error": "target window is not sufficiently visible",
+            "window": window_region,
+        }
+    recording_options = dict(options or {})
+    recording_options["region"] = window_region["region"]
+    target_output = output_path or str(
+        default_output_root() / f"video_capture_{app_name.replace(' ', '_').lower()}_window.mov"
+    )
+    started = await _session.start_recording("macos", target_output, duration_seconds, recording_options)
+    return {
+        **started,
+        "window": window_region,
+    }
+
+
+@mcp.tool()
+async def extract_frames(
+    video_path: str,
+    output_dir: str,
+    mode: str = "scene",
+    scene_threshold: float = 0.1,
+    fps: float | None = None,
+    max_frames: int = 50,
+    inline_images: bool = True,
+    rotate_degrees: int | None = None,
+) -> dict[str, Any]:
+    """Extract key frames from a video."""
+    return await extract_video_frames(
+        video_path,
+        output_dir,
+        mode,
+        scene_threshold,
+        fps,
+        max_frames,
+        inline_images,
+        rotate_degrees,
+    )
+
+
+@mcp.tool()
+async def record_and_extract(
+    target: str,
+    duration_seconds: float,
+    output_dir: str,
+    options: dict[str, Any] | None = None,
+    extract_options: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Record a target for a fixed duration and extract frames in one call."""
+    return await _session.record_and_extract(
+        target,
+        duration_seconds,
+        output_dir,
+        options=options,
+        extract_options=extract_options,
+    )
+
+
+def main() -> None:
+    try:
+        mcp.run()
+    finally:
+        asyncio.run(_session.close())
+
+
+if __name__ == "__main__":
+    main()

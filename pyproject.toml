@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "video-capture-mcp"
+version = "0.1.0"
+description = "MCP server for autonomous macOS, iOS Simulator, and Android screen recording with frame extraction."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+license = {text = "MIT"}
+authors = [
+  {name = "Corvus400", email = "13657682+Corvus400@users.noreply.github.com"},
+]
+keywords = [
+  "mcp",
+  "model-context-protocol",
+  "screen-recording",
+  "macos",
+  "ios-simulator",
+  "android",
+  "fastmcp",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: MacOS",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Multimedia :: Video :: Capture",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+  "mcp>=1.0,<2",
+]
+
+[project.urls]
+Homepage = "https://github.com/Corvus400/video-capture-mcp"
+Repository = "https://github.com/Corvus400/video-capture-mcp"
+Documentation = "https://github.com/Corvus400/video-capture-mcp#readme"
+Changelog = "https://github.com/Corvus400/video-capture-mcp/blob/main/CHANGELOG.md"
+Issues = "https://github.com/Corvus400/video-capture-mcp/issues"
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+]
+dev = [
+  "mypy>=1.10",
+  "pre-commit>=3.7",
+  "ruff>=0.6",
+]
+
+[project.scripts]
+video-capture-mcp = "video_capture_mcp.server:main"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
