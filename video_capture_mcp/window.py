@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import unicodedata
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Protocol
 
@@ -159,4 +160,13 @@ def _intersect(a: Bounds, b: Bounds) -> Bounds:
 
 
 def _escape_applescript(value: str) -> str:
+    _validate_applescript_string(value)
     return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _validate_applescript_string(value: str) -> None:
+    if '"' in value or "\\" in value:
+        raise WindowError("app_name must not contain AppleScript string delimiters.")
+    for char in value:
+        if unicodedata.category(char) in {"Cc", "Cf"}:
+            raise WindowError("app_name must not contain control or format characters.")

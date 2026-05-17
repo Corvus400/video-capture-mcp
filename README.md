@@ -171,6 +171,8 @@ See [docs/development.md](docs/development.md) for clone, local install, tests, 
 
 See [SECURITY.md](SECURITY.md). Report vulnerabilities through GitHub Private Security Advisories.
 
+Explicit `output_path` values are treated as trusted MCP client input. Use MCP client approvals and filesystem policy to control where agents may write.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

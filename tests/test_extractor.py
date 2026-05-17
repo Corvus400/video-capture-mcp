@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import shutil
 
 import pytest
 
+from video_capture_mcp.extractor import ExtractorError
 from video_capture_mcp.extractor import extract_frames
+from video_capture_mcp.extractor import _filter_chain
 from video_capture_mcp.orientation import probe_dimensions
 
 
@@ -64,3 +67,13 @@ async def test_extract_frames_rotates_output_frames(tmp_path) -> None:
 
     dimensions = await probe_dimensions(result["frame_paths"][0])
     assert dimensions == {"width": 90, "height": 160}
+
+
+def test_scene_threshold_rejects_nan() -> None:
+    with pytest.raises(ExtractorError):
+        _filter_chain("scene", math.nan, None, None)
+
+
+def test_fixed_fps_rejects_infinity() -> None:
+    with pytest.raises(ExtractorError):
+        _filter_chain("fixed_fps", 0.1, math.inf, None)

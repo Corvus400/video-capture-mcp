@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import os
 from pathlib import Path
 from typing import Any
@@ -69,11 +70,17 @@ def _filter_chain(
     fps: float | None,
     rotate_degrees: int | None,
 ) -> str:
+    scene_threshold = _finite_float(scene_threshold, "scene_threshold")
     filters: list[str] = []
     if mode == "scene":
+        if scene_threshold < 0:
+            raise ExtractorError("scene_threshold must be greater than or equal to zero.")
         filters.extend([f"select='gt(scene,{scene_threshold})'", "showinfo"])
     elif mode == "fixed_fps":
-        if fps is None or fps <= 0:
+        if fps is None:
+            raise ExtractorError("fps must be greater than zero for fixed_fps mode.")
+        fps = _finite_float(fps, "fps")
+        if fps <= 0:
             raise ExtractorError("fps must be greater than zero for fixed_fps mode.")
         filters.append(f"fps={fps}")
     else:
@@ -83,6 +90,16 @@ def _filter_chain(
     if rotate_filter is not None:
         filters.append(rotate_filter)
     return ",".join(filters)
+
+
+def _finite_float(value: float | int, name: str) -> float:
+    try:
+        normalized = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ExtractorError(f"{name} must be a finite number.") from exc
+    if not math.isfinite(normalized):
+        raise ExtractorError(f"{name} must be a finite number.")
+    return normalized
 
 
 def _rotate_filter(rotate_degrees: int | None) -> str | None:

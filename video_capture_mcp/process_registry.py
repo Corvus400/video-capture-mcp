@@ -39,7 +39,9 @@ class ProcessRegistry:
         tmp_path = self._registry_path.with_suffix(".tmp")
         try:
             tmp_path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+            tmp_path.chmod(0o600)
             tmp_path.replace(self._registry_path)
+            self._registry_path.chmod(0o600)
         except OSError:
             _unlink_quietly(tmp_path)
 
