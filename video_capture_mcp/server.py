@@ -7,7 +7,9 @@ from mcp.server.fastmcp import FastMCP
 
 from video_capture_mcp.extractor import extract_frames as extract_video_frames
 from video_capture_mcp.paths import default_output_root
-from video_capture_mcp.pointer import move_sequence as move_pointer_interpolated_sequence
+from video_capture_mcp.pointer import (
+    move_sequence as move_pointer_interpolated_sequence,
+)
 from video_capture_mcp.pointer import move_pointer as move_pointer_once
 from video_capture_mcp.session import Session
 from video_capture_mcp.window import get_window_region as get_app_window_region
@@ -32,7 +34,9 @@ async def start_recording(
     full desktop recording is intentionally needed or when options.region is
     already known.
     """
-    return await _session.start_recording(target, output_path, duration_seconds, options)
+    return await _session.start_recording(
+        target, output_path, duration_seconds, options
+    )
 
 
 @mcp.tool()
@@ -143,9 +147,12 @@ async def start_app_window_recording(
     recording_options = dict(options or {})
     recording_options["region"] = window_region["region"]
     target_output = output_path or str(
-        default_output_root() / f"video_capture_{app_name.replace(' ', '_').lower()}_window.mov"
+        default_output_root()
+        / f"video_capture_{app_name.replace(' ', '_').lower()}_window.mov"
     )
-    started = await _session.start_recording("macos", target_output, duration_seconds, recording_options)
+    started = await _session.start_recording(
+        "macos", target_output, duration_seconds, recording_options
+    )
     return {
         **started,
         "window": window_region,

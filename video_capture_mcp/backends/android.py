@@ -57,7 +57,9 @@ def remote_path_from_options(options: dict[str, Any] | None = None) -> str:
     return f"/sdcard/video_capture_{uuid.uuid4().hex}.mp4"
 
 
-def pull_command(remote_path: str, output_path: str, options: dict[str, Any] | None = None) -> list[str]:
+def pull_command(
+    remote_path: str, output_path: str, options: dict[str, Any] | None = None
+) -> list[str]:
     args = ["adb"]
     serial = (options or {}).get("serial")
     if serial:
@@ -66,7 +68,9 @@ def pull_command(remote_path: str, output_path: str, options: dict[str, Any] | N
     return args
 
 
-def cleanup_command(remote_path: str, options: dict[str, Any] | None = None) -> list[str]:
+def cleanup_command(
+    remote_path: str, options: dict[str, Any] | None = None
+) -> list[str]:
     args = ["adb"]
     serial = (options or {}).get("serial")
     if serial:
@@ -95,7 +99,11 @@ def _format_size(size: Any) -> str:
     elif isinstance(size, (list, tuple)) and len(size) == 2:
         width, height = size
     else:
-        raise BackendError("options.size must be a WIDTHxHEIGHT string, dict, or two-item list.")
+        raise BackendError(
+            "options.size must be a WIDTHxHEIGHT string, dict, or two-item list."
+        )
+    if width is None or height is None:
+        raise BackendError("options.size must contain width and height.")
     width = int(width)
     height = int(height)
     if width <= 0 or height <= 0:

@@ -20,7 +20,10 @@ CreateProcess = Callable[..., Awaitable[ProcessLike]]
 class ProcessRegistry:
     def __init__(self, registry_dir: Path | None = None) -> None:
         self._server_pid = os.getpid()
-        self._registry_dir = registry_dir or Path.home() / "Library" / "Caches" / "video-capture-mcp" / "sessions"
+        self._registry_dir = (
+            registry_dir
+            or Path.home() / "Library" / "Caches" / "video-capture-mcp" / "sessions"
+        )
         self._registry_path = self._registry_dir / f"server-{self._server_pid}.json"
 
     def write(self, sessions: list[dict[str, Any]]) -> None:
@@ -51,7 +54,9 @@ class ProcessRegistry:
         except OSError:
             pass
 
-    async def cleanup_dead_servers(self, create_process: CreateProcess) -> list[dict[str, Any]]:
+    async def cleanup_dead_servers(
+        self, create_process: CreateProcess
+    ) -> list[dict[str, Any]]:
         cleaned: list[dict[str, Any]] = []
         if not self._registry_dir.exists():
             return cleaned
@@ -79,7 +84,9 @@ def _load_registry(path: Path) -> dict[str, Any] | None:
         return None
 
 
-async def _cleanup_entry(entry: dict[str, Any], create_process: CreateProcess) -> dict[str, Any]:
+async def _cleanup_entry(
+    entry: dict[str, Any], create_process: CreateProcess
+) -> dict[str, Any]:
     target = str(entry.get("target") or "")
     pid = _optional_int(entry.get("pid"))
     result: dict[str, Any] = {
@@ -93,12 +100,19 @@ async def _cleanup_entry(entry: dict[str, Any], create_process: CreateProcess) -
     if target == "android":
         options = dict(entry.get("options") or {})
         remote_path = entry.get("remote_path")
-        result["android_stop_exit_code"] = await _run_command(android.stop_command(options), create_process)
+        result["android_stop_exit_code"] = await _run_command(
+            android.stop_command(options), create_process
+        )
         if isinstance(remote_path, str) and remote_path:
             video_path = str(entry.get("video_path") or "")
             if video_path:
-                result["pull_exit_code"] = await _run_command(android.pull_command(remote_path, video_path, options), create_process)
-            result["cleanup_exit_code"] = await _run_command(android.cleanup_command(remote_path, options), create_process)
+                result["pull_exit_code"] = await _run_command(
+                    android.pull_command(remote_path, video_path, options),
+                    create_process,
+                )
+            result["cleanup_exit_code"] = await _run_command(
+                android.cleanup_command(remote_path, options), create_process
+            )
         return result
     result["skipped"] = "unsupported target"
     return result

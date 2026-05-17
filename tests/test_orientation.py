@@ -42,7 +42,9 @@ async def test_probe_dimensions_reads_ffprobe_json() -> None:
         calls.append(tuple(args))
         return FakeCommunicateProcess('{"streams":[{"width":1280,"height":720}]}')
 
-    result = await orientation.probe_dimensions("/tmp/in.mp4", create_process=fake_create_process)
+    result = await orientation.probe_dimensions(
+        "/tmp/in.mp4", create_process=fake_create_process
+    )
 
     assert result == {"width": 1280, "height": 720}
     assert calls[0][:4] == ("ffprobe", "-v", "error", "-select_streams")
@@ -54,7 +56,9 @@ async def test_probe_dimensions_rejects_missing_stream() -> None:
         return FakeCommunicateProcess('{"streams":[]}')
 
     with pytest.raises(orientation.OrientationError):
-        await orientation.probe_dimensions("/tmp/in.mp4", create_process=fake_create_process)
+        await orientation.probe_dimensions(
+            "/tmp/in.mp4", create_process=fake_create_process
+        )
 
 
 @pytest.mark.asyncio
@@ -65,7 +69,9 @@ async def test_normalize_video_orientation_returns_not_requested() -> None:
 
 
 @pytest.mark.asyncio
-async def test_normalize_video_orientation_skips_when_already_matching(monkeypatch) -> None:
+async def test_normalize_video_orientation_skips_when_already_matching(
+    monkeypatch,
+) -> None:
     async def fake_probe_dimensions(*args, **kwargs):
         return {"width": 1280, "height": 720}
 
@@ -82,7 +88,9 @@ async def test_normalize_video_orientation_skips_when_already_matching(monkeypat
 
 
 @pytest.mark.asyncio
-async def test_normalize_video_orientation_raises_on_ffmpeg_failure(monkeypatch, tmp_path) -> None:
+async def test_normalize_video_orientation_raises_on_ffmpeg_failure(
+    monkeypatch, tmp_path
+) -> None:
     video = tmp_path / "in.mp4"
     video.write_bytes(b"video")
 
@@ -95,7 +103,9 @@ async def test_normalize_video_orientation_raises_on_ffmpeg_failure(monkeypatch,
     monkeypatch.setattr(orientation, "probe_dimensions", fake_probe_dimensions)
 
     with pytest.raises(orientation.OrientationError):
-        await orientation.normalize_video_orientation(str(video), "landscape", create_process=fake_create_process)
+        await orientation.normalize_video_orientation(
+            str(video), "landscape", create_process=fake_create_process
+        )
 
 
 def test_transpose_filter_rejects_zero() -> None:

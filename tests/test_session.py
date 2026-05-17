@@ -40,20 +40,28 @@ class FakeCommunicateProcess:
         return self._stdout, self._stderr
 
 
-def test_default_output_root_uses_environment(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_default_output_root_uses_environment(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
     monkeypatch.setenv("VIDEO_CAPTURE_MCP_OUTPUT_DIR", str(tmp_path))
 
     assert default_output_root() == tmp_path
 
 
-def test_default_output_root_uses_tempdir(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_default_output_root_uses_tempdir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
     monkeypatch.delenv("VIDEO_CAPTURE_MCP_OUTPUT_DIR", raising=False)
-    monkeypatch.setattr("video_capture_mcp.paths.tempfile.gettempdir", lambda: str(tmp_path))
+    monkeypatch.setattr(
+        "video_capture_mcp.paths.tempfile.gettempdir", lambda: str(tmp_path)
+    )
 
     assert default_output_root() == tmp_path / "video-capture-mcp"
 
 
-def test_default_output_path_uses_shared_root(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_default_output_path_uses_shared_root(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
     monkeypatch.setenv("VIDEO_CAPTURE_MCP_OUTPUT_DIR", str(tmp_path))
 
     output_path = session_module._default_output_path("android")
@@ -64,13 +72,17 @@ def test_default_output_path_uses_shared_root(monkeypatch: pytest.MonkeyPatch, t
 
 
 @pytest.mark.asyncio
-async def test_stop_recording_sends_sigint_for_ios(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_stop_recording_sends_sigint_for_ios(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     process = FakeProcess()
 
     async def create_process(*args, **kwargs):
         return process
 
-    monkeypatch.setattr(ios, "build_command", lambda *args, **kwargs: ["recordVideo", "/tmp/test.mov"])
+    monkeypatch.setattr(
+        ios, "build_command", lambda *args, **kwargs: ["recordVideo", "/tmp/test.mov"]
+    )
     session = Session(create_process=create_process, run_precheck=False)
     result = await session.start_recording("ios_simulator", "/tmp/test.mov")
 
@@ -108,7 +120,10 @@ async def test_stop_recording_reports_no_orientation_when_not_requested() -> Non
 
     stopped = await session.stop_recording(result["session_id"])
 
-    assert stopped["orientation"] == {"normalized": False, "reason": "orientation not requested"}
+    assert stopped["orientation"] == {
+        "normalized": False,
+        "reason": "orientation not requested",
+    }
 
 
 @pytest.mark.asyncio
@@ -118,7 +133,9 @@ async def test_rejects_duplicate_target_recording() -> None:
 
     session = Session(create_process=create_process, run_precheck=False)
     first = await session.start_recording("macos", "/tmp/one.mov", duration_seconds=1)
-    duplicate = await session.start_recording("macos", "/tmp/two.mov", duration_seconds=1)
+    duplicate = await session.start_recording(
+        "macos", "/tmp/two.mov", duration_seconds=1
+    )
 
     assert duplicate == {
         "error": "already recording",
@@ -132,7 +149,9 @@ async def test_list_active_sessions_contains_started_session() -> None:
         return FakeProcess()
 
     session = Session(create_process=create_process, run_precheck=False)
-    started = await session.start_recording("macos", "/tmp/test.mov", duration_seconds=1)
+    started = await session.start_recording(
+        "macos", "/tmp/test.mov", duration_seconds=1
+    )
 
     active = session.list_active_sessions()
 
@@ -147,7 +166,9 @@ async def test_list_active_sessions_reaps_finished_session(tmp_path) -> None:
     async def create_process(*args, **kwargs):
         return process
 
-    session = Session(create_process=create_process, run_precheck=False, registry_dir=tmp_path)
+    session = Session(
+        create_process=create_process, run_precheck=False, registry_dir=tmp_path
+    )
     await session.start_recording("macos", "/tmp/test.mov", duration_seconds=1)
     process.returncode = 0
 
@@ -158,14 +179,20 @@ async def test_list_active_sessions_reaps_finished_session(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_close_stops_active_ios_session(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+async def test_close_stops_active_ios_session(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
     process = FakeProcess()
 
     async def create_process(*args, **kwargs):
         return process
 
-    monkeypatch.setattr(ios, "build_command", lambda *args, **kwargs: ["recordVideo", "/tmp/test.mov"])
-    session = Session(create_process=create_process, run_precheck=False, registry_dir=tmp_path)
+    monkeypatch.setattr(
+        ios, "build_command", lambda *args, **kwargs: ["recordVideo", "/tmp/test.mov"]
+    )
+    session = Session(
+        create_process=create_process, run_precheck=False, registry_dir=tmp_path
+    )
     await session.start_recording("ios_simulator", "/tmp/test.mov")
 
     await session.close()
@@ -176,7 +203,9 @@ async def test_close_stops_active_ios_session(monkeypatch: pytest.MonkeyPatch, t
 
 
 @pytest.mark.asyncio
-async def test_cleanup_dead_server_registry_sends_sigint(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+async def test_cleanup_dead_server_registry_sends_sigint(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
     registry_path = tmp_path / "server-999999.json"
     registry_path.write_text(
         """
@@ -206,7 +235,9 @@ async def test_cleanup_dead_server_registry_sends_sigint(monkeypatch: pytest.Mon
         raise AssertionError("ios cleanup should not spawn a subprocess")
 
     monkeypatch.setattr(process_registry.os, "kill", fake_kill)
-    session = Session(create_process=create_process, run_precheck=False, registry_dir=tmp_path)
+    session = Session(
+        create_process=create_process, run_precheck=False, registry_dir=tmp_path
+    )
 
     result = await session.cleanup_stale_processes()
 
@@ -217,7 +248,9 @@ async def test_cleanup_dead_server_registry_sends_sigint(monkeypatch: pytest.Mon
 
 
 @pytest.mark.asyncio
-async def test_hover_sequence_moves_pointer_without_clicking(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_hover_sequence_moves_pointer_without_clicking(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     points: list[tuple[float, float]] = []
 
     def fake_move_pointer_to(point: pointer.CGPoint) -> None:
@@ -252,7 +285,9 @@ async def test_get_window_region_returns_visible_intersection() -> None:
     async def create_process(*args, **kwargs):
         return FakeCommunicateProcess(outputs.pop(0))
 
-    result = await window.get_window_region("Google Chrome", create_process=create_process)
+    result = await window.get_window_region(
+        "Google Chrome", create_process=create_process
+    )
 
     assert result["visible"] is True
     assert result["region"] == {
@@ -302,7 +337,9 @@ async def test_get_window_region_reports_insufficient_visibility() -> None:
     async def create_process(*args, **kwargs):
         return FakeCommunicateProcess(outputs.pop(0))
 
-    result = await window.get_window_region("Google Chrome", create_process=create_process)
+    result = await window.get_window_region(
+        "Google Chrome", create_process=create_process
+    )
 
     assert result["visible"] is False
     assert 0 < result["visible_ratio"] < 0.8
@@ -315,7 +352,9 @@ async def test_get_window_region_reports_insufficient_visibility() -> None:
 
 
 @pytest.mark.asyncio
-async def test_start_app_window_recording_records_visible_region(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_start_app_window_recording_records_visible_region(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     window_region = {
         "visible": True,
         "region": {"x": 100, "y": -1302, "width": 1200, "height": 1276},
@@ -329,7 +368,11 @@ async def test_start_app_window_recording_records_visible_region(monkeypatch: py
     class FakeSessionForServer:
         async def start_recording(self, target, output_path, duration_seconds, options):
             calls.append((target, output_path, duration_seconds, options))
-            return {"session_id": "session-1", "video_path": output_path, "mode": "scheduled"}
+            return {
+                "session_id": "session-1",
+                "video_path": output_path,
+                "mode": "scheduled",
+            }
 
     monkeypatch.setattr(server, "get_app_window_region", fake_get_window_region)
     monkeypatch.setattr(server, "_session", FakeSessionForServer())
@@ -372,7 +415,11 @@ async def test_start_app_window_recording_uses_shared_default_output_root(
     class FakeSessionForServer:
         async def start_recording(self, target, output_path, duration_seconds, options):
             calls.append((target, output_path, duration_seconds, options))
-            return {"session_id": "session-1", "video_path": output_path, "mode": "scheduled"}
+            return {
+                "session_id": "session-1",
+                "video_path": output_path,
+                "mode": "scheduled",
+            }
 
     monkeypatch.setenv("VIDEO_CAPTURE_MCP_OUTPUT_DIR", str(tmp_path))
     monkeypatch.setattr(server, "get_app_window_region", fake_get_window_region)
@@ -380,12 +427,16 @@ async def test_start_app_window_recording_uses_shared_default_output_root(
 
     result = await server.start_app_window_recording("Google Chrome", 3)
 
-    assert result["video_path"] == str(tmp_path / "video_capture_google_chrome_window.mov")
+    assert result["video_path"] == str(
+        tmp_path / "video_capture_google_chrome_window.mov"
+    )
     assert calls[0][1] == str(tmp_path / "video_capture_google_chrome_window.mov")
 
 
 @pytest.mark.asyncio
-async def test_start_app_window_recording_rejects_hidden_window(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_start_app_window_recording_rejects_hidden_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     window_region = {
         "visible": False,
         "region": {"x": 3000, "y": 100, "width": 440, "height": 600},
@@ -411,7 +462,9 @@ async def test_start_app_window_recording_rejects_hidden_window(monkeypatch: pyt
 
 
 @pytest.mark.asyncio
-async def test_server_hover_sequence_can_activate_app(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_server_hover_sequence_can_activate_app(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     active_window = {
         "app_name": "Google Chrome",
         "visible": True,
@@ -431,7 +484,9 @@ async def test_server_hover_sequence_can_activate_app(monkeypatch: pytest.Monkey
         return {"points": points, "hold_seconds": kwargs["hold_seconds"]}
 
     monkeypatch.setattr(server, "get_app_window_region", fake_get_window_region)
-    monkeypatch.setattr(server, "move_pointer_interpolated_sequence", fake_hover_sequence)
+    monkeypatch.setattr(
+        server, "move_pointer_interpolated_sequence", fake_hover_sequence
+    )
 
     result = await server.hover_sequence(
         [{"x": 100, "y": -200}],
@@ -451,7 +506,9 @@ async def test_server_hover_sequence_can_activate_app(monkeypatch: pytest.Monkey
 async def test_start_recording_returns_error_object_for_backend_failure() -> None:
     session = Session(run_precheck=False)
 
-    result = await session.start_recording("android", "/tmp/test.mp4", options={"size": "bad"})
+    result = await session.start_recording(
+        "android", "/tmp/test.mp4", options={"size": "bad"}
+    )
 
     assert result["target"] == "android"
     assert "options.size" in result["error"]
@@ -511,9 +568,31 @@ async def test_android_stop_sends_sigint_pulls_and_cleans_remote() -> None:
         "--time-limit",
         "0",
     )
-    assert calls[1] == ("adb", "-s", "emulator-5554", "shell", "pkill", "-2", "screenrecord")
-    assert calls[2] == ("adb", "-s", "emulator-5554", "pull", stopped["remote_path"], "/tmp/android.mp4")
-    assert calls[3] == ("adb", "-s", "emulator-5554", "shell", "rm", stopped["remote_path"])
+    assert calls[1] == (
+        "adb",
+        "-s",
+        "emulator-5554",
+        "shell",
+        "pkill",
+        "-2",
+        "screenrecord",
+    )
+    assert calls[2] == (
+        "adb",
+        "-s",
+        "emulator-5554",
+        "pull",
+        stopped["remote_path"],
+        "/tmp/android.mp4",
+    )
+    assert calls[3] == (
+        "adb",
+        "-s",
+        "emulator-5554",
+        "shell",
+        "rm",
+        stopped["remote_path"],
+    )
     assert stopped["android_stop_exit_code"] == 0
     assert stopped["pull_exit_code"] == 0
     assert stopped["cleanup_exit_code"] == 0

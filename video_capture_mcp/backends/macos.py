@@ -14,7 +14,9 @@ class BackendError(RuntimeError):
 
 
 async def precheck() -> None:
-    probe_path = Path(tempfile.gettempdir()) / f"_video_capture_tcc_probe_{uuid.uuid4().hex}.mov"
+    probe_path = (
+        Path(tempfile.gettempdir()) / f"_video_capture_tcc_probe_{uuid.uuid4().hex}.mov"
+    )
     proc = await asyncio.create_subprocess_exec(
         "screencapture",
         "-V",
@@ -47,7 +49,9 @@ def build_command(
     options: dict[str, Any] | None = None,
 ) -> list[str]:
     if duration_seconds is None:
-        raise BackendError("macOS recording requires duration_seconds because screencapture uses -V.")
+        raise BackendError(
+            "macOS recording requires duration_seconds because screencapture uses -V."
+        )
     if duration_seconds <= 0:
         raise BackendError("duration_seconds must be greater than zero.")
 
@@ -69,13 +73,14 @@ def build_command(
 
 def _format_region(region: Any) -> str:
     if isinstance(region, dict):
-        values = [region.get(key) for key in ("x", "y", "width", "height")]
+        raw_values = [region.get(key) for key in ("x", "y", "width", "height")]
     elif isinstance(region, (list, tuple)):
-        values = list(region)
+        raw_values = list(region)
     else:
         raise BackendError("options.region must be a dict or a four-item list.")
-    if len(values) != 4 or any(value is None for value in values):
+    if len(raw_values) != 4 or any(value is None for value in raw_values):
         raise BackendError("options.region must contain x, y, width, and height.")
+    values = [value for value in raw_values if value is not None]
     ints = [int(value) for value in values]
     if ints[2] <= 0 or ints[3] <= 0:
         raise BackendError("region width and height must be greater than zero.")

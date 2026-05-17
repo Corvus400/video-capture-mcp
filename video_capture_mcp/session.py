@@ -7,7 +7,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Protocol
+from typing import Any, Awaitable, Callable, Protocol, cast
 
 from video_capture_mcp.backends import android, ios, macos
 from video_capture_mcp.extractor import extract_frames
@@ -20,12 +20,15 @@ class ProcessLike(Protocol):
     pid: int | None
     returncode: int | None
 
+    async def communicate(self) -> tuple[bytes, bytes]: ...
+
     def send_signal(self, sig: signal.Signals) -> None: ...
 
     async def wait(self) -> int: ...
 
 
 CreateProcess = Callable[..., Awaitable[ProcessLike]]
+DEFAULT_CREATE_PROCESS = cast(CreateProcess, asyncio.create_subprocess_exec)
 
 
 @dataclass
@@ -58,7 +61,7 @@ class Session:
         run_precheck: bool = True,
         registry_dir: Path | None = None,
     ) -> None:
-        self._create_process = create_process or asyncio.create_subprocess_exec
+        self._create_process: CreateProcess = create_process or DEFAULT_CREATE_PROCESS
         self._run_precheck = run_precheck
         self._sessions: dict[str, ActiveSession] = {}
         self._target_index: dict[str, str] = {}
@@ -82,7 +85,11 @@ class Session:
                 "existing_session_id": existing_id,
             }
 
-        video_path = _default_output_path(target) if output_path is None else os.fspath(Path(output_path).expanduser())
+        video_path = (
+            _default_output_path(target)
+            if output_path is None
+            else os.fspath(Path(output_path).expanduser())
+        )
         recording_options = dict(options or {})
         remote_path = None
         if target == "android":
@@ -92,7 +99,9 @@ class Session:
         try:
             if self._run_precheck:
                 await backend.precheck()
-            argv = backend.build_command(video_path, duration_seconds, recording_options)
+            argv = backend.build_command(
+                video_path, duration_seconds, recording_options
+            )
             process = await self._create_process(
                 *argv,
                 stdout=asyncio.subprocess.PIPE,
@@ -131,13 +140,21 @@ class Session:
             if active.target == "ios_simulator" and active.process.returncode is None:
                 active.process.send_signal(signal.SIGINT)
             if active.target == "android" and active.process.returncode is None:
-                android_stop_exit_code = await self._run_command(android.stop_command(active.options))
+                android_stop_exit_code = await self._run_command(
+                    android.stop_command(active.options)
+                )
             exit_code = await active.process.wait()
             pull_exit_code = None
             cleanup_exit_code = None
             if active.target == "android" and active.remote_path is not None:
-                pull_exit_code = await self._run_command(android.pull_command(active.remote_path, active.video_path, active.options))
-                cleanup_exit_code = await self._run_command(android.cleanup_command(active.remote_path, active.options))
+                pull_exit_code = await self._run_command(
+                    android.pull_command(
+                        active.remote_path, active.video_path, active.options
+                    )
+                )
+                cleanup_exit_code = await self._run_command(
+                    android.cleanup_command(active.remote_path, active.options)
+                )
             orientation_result = await normalize_video_orientation(
                 active.video_path,
                 active.options.get("orientation"),
@@ -190,7 +207,9 @@ class Session:
         normalized = _normalize_target(target)
         suffix = ".mp4" if normalized == "android" else ".mov"
         video_path = os.fspath(output / f"recording{suffix}")
-        started = await self.start_recording(normalized, video_path, duration_seconds, options)
+        started = await self.start_recording(
+            normalized, video_path, duration_seconds, options
+        )
         if "error" in started:
             return started
         await asyncio.sleep(duration_seconds)
@@ -226,10 +245,16 @@ class Session:
                 self._forget_session(active)
 
     def _write_registry(self) -> None:
-        self._registry.write([session.as_dict() | {
-            "options": session.options,
-            "remote_path": session.remote_path,
-        } for session in self._sessions.values()])
+        self._registry.write(
+            [
+                session.as_dict()
+                | {
+                    "options": session.options,
+                    "remote_path": session.remote_path,
+                }
+                for session in self._sessions.values()
+            ]
+        )
 
 
 def _normalize_target(target: str) -> str:

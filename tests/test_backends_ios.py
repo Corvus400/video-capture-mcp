@@ -40,11 +40,21 @@ async def test_ios_precheck_reports_command_failure(monkeypatch) -> None:
 def test_ios_build_command_uses_default_booted(tmp_path) -> None:
     command = ios.build_command(str(tmp_path / "out.mov"), None)
 
-    assert command[:7] == ["xcrun", "simctl", "io", "booted", "recordVideo", "--codec", "h264"]
+    assert command[:7] == [
+        "xcrun",
+        "simctl",
+        "io",
+        "booted",
+        "recordVideo",
+        "--codec",
+        "h264",
+    ]
 
 
 def test_ios_build_command_uses_udid_and_display(tmp_path) -> None:
-    command = ios.build_command(str(tmp_path / "out.mov"), None, {"udid": "ABC", "display": "external"})
+    command = ios.build_command(
+        str(tmp_path / "out.mov"), None, {"udid": "ABC", "display": "external"}
+    )
 
     assert command == [
         "xcrun",

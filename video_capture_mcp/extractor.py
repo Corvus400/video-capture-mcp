@@ -74,7 +74,9 @@ def _filter_chain(
     filters: list[str] = []
     if mode == "scene":
         if scene_threshold < 0:
-            raise ExtractorError("scene_threshold must be greater than or equal to zero.")
+            raise ExtractorError(
+                "scene_threshold must be greater than or equal to zero."
+            )
         filters.extend([f"select='gt(scene,{scene_threshold})'", "showinfo"])
     elif mode == "fixed_fps":
         if fps is None:
@@ -129,7 +131,9 @@ async def _run_ffmpeg(argv: list[str]) -> None:
         )
 
 
-async def _extract_first_frame(source: str, destination: Path, rotate_degrees: int | None) -> list[str]:
+async def _extract_first_frame(
+    source: str, destination: Path, rotate_degrees: int | None
+) -> list[str]:
     frame = destination / "frame_0001.png"
     filters = []
     rotate_filter = _rotate_filter(rotate_degrees)
@@ -149,7 +153,6 @@ def _limit_frames(frame_paths: list[str], max_frames: int) -> list[str]:
         return [frame_paths[0]]
     last_index = len(frame_paths) - 1
     selected_indexes = {
-        round(index * last_index / (max_frames - 1))
-        for index in range(max_frames)
+        round(index * last_index / (max_frames - 1)) for index in range(max_frames)
     }
     return [path for index, path in enumerate(frame_paths) if index in selected_indexes]

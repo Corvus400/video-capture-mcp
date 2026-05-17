@@ -18,7 +18,9 @@ class FakeCommunicateProcess:
 @pytest.mark.asyncio
 async def test_android_precheck_detects_device(monkeypatch) -> None:
     async def fake_create_process(*args, **kwargs):
-        return FakeCommunicateProcess(stdout="List of devices attached\nemulator-5554\tdevice\n")
+        return FakeCommunicateProcess(
+            stdout="List of devices attached\nemulator-5554\tdevice\n"
+        )
 
     monkeypatch.setattr(android.asyncio, "create_subprocess_exec", fake_create_process)
 
@@ -28,7 +30,9 @@ async def test_android_precheck_detects_device(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_android_precheck_rejects_no_device(monkeypatch) -> None:
     async def fake_create_process(*args, **kwargs):
-        return FakeCommunicateProcess(stdout="List of devices attached\nemulator-5554\tunauthorized\n")
+        return FakeCommunicateProcess(
+            stdout="List of devices attached\nemulator-5554\tunauthorized\n"
+        )
 
     monkeypatch.setattr(android.asyncio, "create_subprocess_exec", fake_create_process)
 

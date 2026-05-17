@@ -28,7 +28,9 @@ def move_pointer(x: float | int, y: float | int) -> dict[str, float]:
     return {"x": point.x, "y": point.y}
 
 
-async def hover_sequence(points: Iterable[Any], hold_seconds: float = 0.5) -> dict[str, Any]:
+async def hover_sequence(
+    points: Iterable[Any], hold_seconds: float = 0.5
+) -> dict[str, Any]:
     return await move_sequence(points, hold_seconds=hold_seconds)
 
 
@@ -81,7 +83,9 @@ def _point_from_values(x: Any, y: Any) -> CGPoint:
     return point
 
 
-def _interpolated_points(previous: CGPoint | None, point: CGPoint, steps_per_segment: int) -> list[CGPoint]:
+def _interpolated_points(
+    previous: CGPoint | None, point: CGPoint, steps_per_segment: int
+) -> list[CGPoint]:
     if previous is None or steps_per_segment == 1:
         return [point]
     return [

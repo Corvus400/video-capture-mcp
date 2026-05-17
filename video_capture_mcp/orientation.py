@@ -5,7 +5,7 @@ import json
 import os
 import uuid
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Protocol
+from typing import Any, Awaitable, Callable, Protocol, cast
 
 
 class ProcessLike(Protocol):
@@ -15,6 +15,7 @@ class ProcessLike(Protocol):
 
 
 CreateProcess = Callable[..., Awaitable[ProcessLike]]
+DEFAULT_CREATE_PROCESS = cast(CreateProcess, asyncio.create_subprocess_exec)
 
 
 class OrientationError(RuntimeError):
@@ -25,7 +26,7 @@ async def normalize_video_orientation(
     video_path: str,
     desired_orientation: str | None,
     *,
-    create_process: CreateProcess = asyncio.create_subprocess_exec,
+    create_process: CreateProcess = DEFAULT_CREATE_PROCESS,
     rotate_degrees: int | None = None,
 ) -> dict[str, Any]:
     if desired_orientation is None and rotate_degrees is None:
@@ -33,9 +34,16 @@ async def normalize_video_orientation(
 
     path = os.fspath(Path(video_path).expanduser())
     before = await probe_dimensions(path, create_process=create_process)
-    degrees = _rotation_needed(before["width"], before["height"], desired_orientation, rotate_degrees)
+    degrees = _rotation_needed(
+        before["width"], before["height"], desired_orientation, rotate_degrees
+    )
     if degrees == 0:
-        return {"normalized": False, "reason": "already matches orientation", "before": before, "after": before}
+        return {
+            "normalized": False,
+            "reason": "already matches orientation",
+            "before": before,
+            "after": before,
+        }
 
     output = _temporary_output_path(path)
     proc = await create_process(
@@ -54,7 +62,9 @@ async def normalize_video_orientation(
     exit_code = await proc.wait()
     if exit_code != 0:
         Path(output).unlink(missing_ok=True)
-        raise OrientationError(f"ffmpeg orientation normalization failed with exit code {exit_code}")
+        raise OrientationError(
+            f"ffmpeg orientation normalization failed with exit code {exit_code}"
+        )
     Path(output).replace(path)
     after = await probe_dimensions(path, create_process=create_process)
     return {
@@ -68,7 +78,7 @@ async def normalize_video_orientation(
 async def probe_dimensions(
     video_path: str,
     *,
-    create_process: CreateProcess = asyncio.create_subprocess_exec,
+    create_process: CreateProcess = DEFAULT_CREATE_PROCESS,
 ) -> dict[str, int]:
     proc = await create_process(
         "ffprobe",
@@ -95,7 +105,9 @@ async def probe_dimensions(
     }
 
 
-def _rotation_needed(width: int, height: int, desired_orientation: str | None, rotate_degrees: int | None) -> int:
+def _rotation_needed(
+    width: int, height: int, desired_orientation: str | None, rotate_degrees: int | None
+) -> int:
     if rotate_degrees is not None:
         return _normalize_degrees(rotate_degrees)
     if desired_orientation is None:
@@ -127,4 +139,6 @@ def _transpose_filter(degrees: int) -> str:
 
 def _temporary_output_path(path: str) -> str:
     source = Path(path)
-    return os.fspath(source.with_name(f"{source.stem}.normalized-{uuid.uuid4().hex}{source.suffix}"))
+    return os.fspath(
+        source.with_name(f"{source.stem}.normalized-{uuid.uuid4().hex}{source.suffix}")
+    )

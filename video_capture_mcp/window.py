@@ -4,7 +4,7 @@ import asyncio
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Protocol
+from typing import Any, Awaitable, Callable, Protocol, cast
 
 
 class WindowError(RuntimeError):
@@ -18,6 +18,7 @@ class ProcessLike(Protocol):
 
 
 CreateProcess = Callable[..., Awaitable[ProcessLike]]
+DEFAULT_CREATE_PROCESS = cast(CreateProcess, asyncio.create_subprocess_exec)
 
 
 @dataclass(frozen=True)
@@ -57,14 +58,18 @@ async def get_window_region(
     min_visible_ratio: float = 0.8,
     activate: bool = False,
     activation_delay_seconds: float = 0.2,
-    create_process: CreateProcess = asyncio.create_subprocess_exec,
+    create_process: CreateProcess = DEFAULT_CREATE_PROCESS,
 ) -> dict[str, Any]:
     if not app_name.strip():
         raise WindowError("app_name must not be empty.")
     if min_visible_ratio <= 0 or min_visible_ratio > 1:
-        raise WindowError("min_visible_ratio must be greater than 0 and less than or equal to 1.")
+        raise WindowError(
+            "min_visible_ratio must be greater than 0 and less than or equal to 1."
+        )
     if activation_delay_seconds < 0:
-        raise WindowError("activation_delay_seconds must be greater than or equal to zero.")
+        raise WindowError(
+            "activation_delay_seconds must be greater than or equal to zero."
+        )
     if activate:
         await activate_app(app_name, create_process=create_process)
         if activation_delay_seconds:
@@ -95,11 +100,14 @@ async def get_window_region(
 async def activate_app(
     app_name: str,
     *,
-    create_process: CreateProcess = asyncio.create_subprocess_exec,
+    create_process: CreateProcess = DEFAULT_CREATE_PROCESS,
 ) -> dict[str, Any]:
     if not app_name.strip():
         raise WindowError("app_name must not be empty.")
-    await _run_osascript(f'tell application "{_escape_applescript(app_name)}" to activate', create_process)
+    await _run_osascript(
+        f'tell application "{_escape_applescript(app_name)}" to activate',
+        create_process,
+    )
     return {"app_name": app_name, "activated": True}
 
 
@@ -110,7 +118,10 @@ async def _front_window_bounds(app_name: str, create_process: CreateProcess) -> 
 
 async def _desktop_bounds(create_process: CreateProcess) -> Bounds:
     return _parse_bounds(
-        await _run_osascript('tell application "Finder" to get bounds of window of desktop', create_process),
+        await _run_osascript(
+            'tell application "Finder" to get bounds of window of desktop',
+            create_process,
+        ),
         "desktop",
     )
 
@@ -136,7 +147,9 @@ def _parse_bounds(text: str, label: str) -> Bounds:
         raise WindowError(f"could not parse {label} bounds: {text!r}")
     left, top, right, bottom = values
     if right <= left or bottom <= top:
-        raise WindowError(f"{label} bounds must have positive width and height: {text!r}")
+        raise WindowError(
+            f"{label} bounds must have positive width and height: {text!r}"
+        )
     return Bounds(left, top, right, bottom)
 
 

@@ -12,16 +12,18 @@ from video_capture_mcp.process_registry import ProcessRegistry
 def test_registry_file_is_0600(tmp_path) -> None:
     registry = ProcessRegistry(tmp_path)
 
-    registry.write([
-        {
-            "session_id": "session-1",
-            "target": "macos",
-            "started_at": "2026-05-18T00:00:00+00:00",
-            "video_path": "/tmp/video.mov",
-            "mode": "scheduled",
-            "pid": 1234,
-        }
-    ])
+    registry.write(
+        [
+            {
+                "session_id": "session-1",
+                "target": "macos",
+                "started_at": "2026-05-18T00:00:00+00:00",
+                "video_path": "/tmp/video.mov",
+                "mode": "scheduled",
+                "pid": 1234,
+            }
+        ]
+    )
 
     registry_file = next(tmp_path.glob("server-*.json"))
 
@@ -77,7 +79,9 @@ async def test_cleanup_dead_servers_sends_sigint(monkeypatch, tmp_path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_cleanup_dead_android_session_runs_stop_pull_and_cleanup(monkeypatch, tmp_path) -> None:
+async def test_cleanup_dead_android_session_runs_stop_pull_and_cleanup(
+    monkeypatch, tmp_path
+) -> None:
     registry_path = tmp_path / "server-999999.json"
     registry_path.write_text(
         """
@@ -120,9 +124,31 @@ async def test_cleanup_dead_android_session_runs_stop_pull_and_cleanup(monkeypat
     assert result[0]["android_stop_exit_code"] == 0
     assert result[0]["pull_exit_code"] == 0
     assert result[0]["cleanup_exit_code"] == 0
-    assert commands[0] == ("adb", "-s", "emulator-5554", "shell", "pkill", "-2", "screenrecord")
-    assert commands[1] == ("adb", "-s", "emulator-5554", "pull", "/sdcard/old.mp4", "/tmp/android.mp4")
-    assert commands[2] == ("adb", "-s", "emulator-5554", "shell", "rm", "/sdcard/old.mp4")
+    assert commands[0] == (
+        "adb",
+        "-s",
+        "emulator-5554",
+        "shell",
+        "pkill",
+        "-2",
+        "screenrecord",
+    )
+    assert commands[1] == (
+        "adb",
+        "-s",
+        "emulator-5554",
+        "pull",
+        "/sdcard/old.mp4",
+        "/tmp/android.mp4",
+    )
+    assert commands[2] == (
+        "adb",
+        "-s",
+        "emulator-5554",
+        "shell",
+        "rm",
+        "/sdcard/old.mp4",
+    )
 
 
 @pytest.mark.asyncio
