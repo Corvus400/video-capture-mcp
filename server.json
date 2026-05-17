@@ -1,0 +1,69 @@
+{
+  "name": "video-capture-mcp",
+  "displayName": "Video Capture MCP",
+  "description": "MCP server for macOS, iOS Simulator, and Android screen recording with frame extraction.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Corvus400/video-capture-mcp"
+  },
+  "license": "MIT",
+  "command": "uvx video-capture-mcp",
+  "runtime": {
+    "platforms": ["macOS"],
+    "python": ">=3.11,<3.13",
+    "requirements": ["ffmpeg", "ffprobe"],
+    "optionalRequirements": ["Xcode Command Line Tools", "Android platform-tools"]
+  },
+  "tools": [
+    {
+      "name": "start_recording",
+      "description": "Start recording macOS, iOS Simulator, or Android.",
+      "arguments": ["target", "duration_seconds", "output_path", "options"]
+    },
+    {
+      "name": "stop_recording",
+      "description": "Stop a running recording session.",
+      "arguments": ["session_id"]
+    },
+    {
+      "name": "start_app_window_recording",
+      "description": "Record the visible front-window region of a macOS app.",
+      "arguments": ["app_name", "duration_seconds", "output_path", "padding", "min_visible_ratio", "options"]
+    },
+    {
+      "name": "get_window_region",
+      "description": "Measure visible front-window bounds for a macOS app.",
+      "arguments": ["app_name", "padding", "min_visible_ratio", "activate"]
+    },
+    {
+      "name": "hover_sequence",
+      "description": "Move the macOS pointer through hover points without clicking.",
+      "arguments": ["points", "hold_seconds", "app_name", "steps_per_segment", "step_delay_seconds"]
+    },
+    {
+      "name": "move_pointer",
+      "description": "Move the macOS pointer once without clicking.",
+      "arguments": ["x", "y"]
+    },
+    {
+      "name": "extract_frames",
+      "description": "Extract PNG frames from a video with scene or fixed-fps mode.",
+      "arguments": ["video_path", "output_dir", "mode", "scene_threshold", "fps", "max_frames", "inline_images", "rotate_degrees"]
+    },
+    {
+      "name": "record_and_extract",
+      "description": "Record a target and extract frames in one call.",
+      "arguments": ["target", "duration_seconds", "output_dir", "options", "extract_options"]
+    },
+    {
+      "name": "list_active_sessions",
+      "description": "List active recording sessions.",
+      "arguments": []
+    },
+    {
+      "name": "cleanup_stale_processes",
+      "description": "Clean up stale recordings from dead previous server processes.",
+      "arguments": []
+    }
+  ]
+}

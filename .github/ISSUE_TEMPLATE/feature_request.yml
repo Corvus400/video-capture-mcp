@@ -1,0 +1,24 @@
+name: Feature request
+description: Propose a new backend, option, tool, or workflow.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use case
+      description: What workflow should this unlock?
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_api
+    attributes:
+      label: Proposed API
+      description: Tool name, arguments, options, and expected return value.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Existing tools or workarounds you considered.
