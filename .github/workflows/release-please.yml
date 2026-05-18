@@ -5,6 +5,7 @@ on:
     branches: [main]
 
 permissions:
+  actions: write
   contents: write
   pull-requests: write
 
@@ -16,3 +17,15 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+      - name: Trigger CI for release PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_branch="$(gh pr list \
+            --state open \
+            --search 'chore(main): release in:title' \
+            --json headRefName \
+            --jq '.[0].headRefName // ""')"
+          if [ -n "$release_branch" ]; then
+            gh workflow run ci.yml --ref "$release_branch"
+          fi

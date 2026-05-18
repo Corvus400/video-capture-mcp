@@ -57,3 +57,12 @@ Token scope:
 - Contents: read and write
 
 The main repository workflow `.github/workflows/update-homebrew.yml` dispatches the tap repository workflow after a GitHub Release is published.
+
+## Release PR Checks
+
+Release Please opens release PRs with the repository `GITHUB_TOKEN`, which does
+not reliably trigger `pull_request` checks for the generated release branch.
+The main repository workflow `.github/workflows/release-please.yml` dispatches
+`.github/workflows/ci.yml` for the open release PR branch after the release PR is
+created. Keep `workflow_dispatch` enabled on `ci.yml`; otherwise release PRs can
+remain blocked with no required checks reported.
