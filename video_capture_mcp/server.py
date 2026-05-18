@@ -158,8 +158,7 @@ async def stop_recording(
         str,
         Field(
             description=(
-                "session_id returned by start_recording or "
-                "start_app_window_recording."
+                "session_id returned by start_recording or start_app_window_recording."
             )
         ),
     ],
@@ -285,7 +284,7 @@ async def hover_sequence(
         str | None,
         Field(
             description=(
-                "macOS app to activate before moving. Omit if no activation " "needed."
+                "macOS app to activate before moving. Omit if no activation needed."
             )
         ),
     ] = None,
