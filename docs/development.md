@@ -47,6 +47,16 @@ Install development dependencies, then run pre-commit:
 pre-commit run --all-files
 ```
 
+## Doc and Description Sync
+
+`video_capture_mcp/server.py` exposes server instructions and tool descriptions over MCP. These are the only documentation that reaches client LLMs (Claude Code, Codex, etc.) automatically. Keep them in sync with the canonical docs:
+
+- `docs/tools.md` is the canonical reference for tool parameters and options.
+- `docs/permissions.md` is the canonical reference for macOS TCC permissions.
+- `docs/troubleshooting.md` is the canonical reference for error messages and recovery steps.
+
+When changing any of the above docs, also update the corresponding `SERVER_INSTRUCTIONS` block or `@mcp.tool()` docstring in `video_capture_mcp/server.py`. The MCP smoke test in this file verifies the wiring; add keyword assertions there when introducing a new tool or target alias.
+
 ## Build
 
 ```bash

@@ -207,3 +207,5 @@ Clean up recording processes left by a dead previous server process.
 Parameters: none.
 
 The server also calls this before starting a recording. It only acts on registry files owned by the current OS user.
+
+> Tool descriptions in `video_capture_mcp/server.py` mirror this file. Update both when changing parameters, options, or return shapes.
