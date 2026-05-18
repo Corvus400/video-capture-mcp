@@ -17,7 +17,62 @@ from video_capture_mcp.session import Session
 from video_capture_mcp.window import get_window_region as get_app_window_region
 
 
-mcp = FastMCP("video_capture")
+SERVER_INSTRUCTIONS = """\
+video_capture MCP server — record macOS / iOS Simulator / Android screen, then extract key frames.
+
+Use this server when screenshots are insufficient: keyboard reveal, hover/unhover, transient layout glitches, animation regressions, or any UI change between two frames.
+
+# Decision tree
+1. Recording a macOS app or browser window? -> start_app_window_recording (activates and bounds to the visible front window).
+2. Recording the full macOS desktop, a specific region, or a non-foreground window? -> start_recording target="macos" with options.region.
+3. Recording an iOS Simulator? -> start_recording target="ios_simulator". Pass options.udid when multiple simulators are booted.
+4. Recording an Android device? -> start_recording target="android". Pass options.serial when multiple devices are attached.
+5. Need a fixed-duration recording with frame extraction in one call? -> record_and_extract.
+6. Hover-only UI verification (no clicks)? -> hover_sequence (preferred over move_pointer when multiple points).
+
+# Target aliases (start_recording.target)
+macos | mac | desktop -> macOS screencapture
+ios_simulator | ios-simulator | ios | simulator -> xcrun simctl
+android -> adb shell screenrecord
+
+# Manual-stop workflow (preferred for agent-driven UI verification)
+1. Call start_recording or start_app_window_recording WITHOUT duration_seconds.
+2. Save the returned session_id.
+3. Operate the UI (Computer Use, hover_sequence, etc.).
+4. Call stop_recording(session_id).
+5. Verify the response: file_exists must be true and file_size_bytes must be > 0 before extracting frames. If false/zero, the recording failed — check permissions and retry.
+
+# Session management
+- list_active_sessions returns all live sessions for this server process.
+- stop_all_recordings clears every session for this process, optionally filtered by target. Use when session_id is lost or duplicate-target protection blocks a new start_recording.
+- cleanup_stale_processes reaps recordings owned by dead prior server PIDs (current OS user only). The server auto-runs this before each start_recording, but call it explicitly if start fails with stale-process errors.
+
+# Permissions (macOS only; required before first use)
+- Screen Recording: required for target=macos and start_app_window_recording. System Settings -> Privacy & Security -> Screen Recording -> add the launcher process -> fully restart the MCP client.
+- Accessibility: required for move_pointer and hover_sequence. Same flow under Accessibility.
+- iOS Simulator and Android do NOT need Screen Recording (they use xcrun simctl / adb).
+- ffmpeg and ffprobe must be on PATH for extract_frames and orientation normalization. Install with `brew install ffmpeg`.
+- If a recording or pointer tool fails with TCC denial, the agent cannot self-recover; surface the error to the user with the System Settings path.
+
+# Output paths
+- If output_path is omitted, recordings go to $VIDEO_CAPTURE_MCP_OUTPUT_DIR (when set) or to the system temp directory under video-capture-mcp.
+- explicit output_path is treated as trusted client input; the agent is responsible for choosing a safe directory.
+
+# Common failure modes and recovery
+- "TCC permission required" -> surface to user; agent cannot grant permission.
+- "ffmpeg failed" or "No such file or directory: ffprobe" -> install ffmpeg via brew.
+- "no booted simulator" -> xcrun simctl boot <UDID>, or pass options.udid.
+- iOS multi-simulator -> always pass options.udid explicitly.
+- "no Android device" / unauthorized -> ask user to accept the USB-debugging prompt, then adb kill-server && adb start-server. Always pass options.serial when more than one device is attached.
+- start_app_window_recording returns {error, window} when visible_ratio < min_visible_ratio -> reposition or unminimize the target window, then retry.
+
+# What NOT to do
+- Do not call start_recording target=macos for a single visible app window; use start_app_window_recording so only that window region is captured.
+- Do not chain stop_recording calls without checking file_size_bytes; an empty file means the backend never wrote anything.
+- Do not pass relative output_path; prefer absolute paths under VIDEO_CAPTURE_MCP_OUTPUT_DIR.
+"""
+
+mcp = FastMCP("video_capture", instructions=SERVER_INSTRUCTIONS)
 _session = Session()
 
 
