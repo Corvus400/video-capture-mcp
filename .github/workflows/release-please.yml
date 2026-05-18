@@ -25,9 +25,8 @@ jobs:
           release_json="$(gh pr list \
             --repo "$GITHUB_REPOSITORY" \
             --state open \
-            --search 'chore(main): release in:title' \
-            --json headRefName,headRefOid \
-            --jq '.[0] // empty')"
+            --json title,headRefName,headRefOid \
+            --jq '[.[] | select(.title | startswith("chore(main): release "))][0] // empty')"
           if [ -z "$release_json" ]; then
             exit 0
           fi
