@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.1] - 2026-05-18
+
+### Fixed
+
+- Prevent `stop_recording` hangs when recorder, adb, or ffmpeg subprocess output
+  fills pipe buffers.
+- Allow concurrent iPhone, iPad, and Android recordings by tracking active
+  sessions per device instead of per target family.
+
 ## [0.1.0](https://github.com/Corvus400/video-capture-mcp/compare/v0.1.0...v0.1.0) (2026-05-17)
 
 

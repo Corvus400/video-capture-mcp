@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import signal
 
 import pytest
@@ -28,6 +29,10 @@ class FakeProcess:
         if self.returncode is None:
             self.returncode = 0
         return self.returncode
+
+    async def communicate(self) -> tuple[bytes, bytes]:
+        await self.wait()
+        return b"", b""
 
 
 class FakeCommunicateProcess:
@@ -141,6 +146,63 @@ async def test_rejects_duplicate_target_recording() -> None:
         "error": "already recording",
         "existing_session_id": first["session_id"],
     }
+
+
+@pytest.mark.asyncio
+async def test_allows_distinct_ios_simulators_to_record_concurrently() -> None:
+    async def create_process(*args, **kwargs):
+        return FakeProcess()
+
+    session = Session(create_process=create_process, run_precheck=False)
+
+    ipad, iphone = await asyncio.gather(
+        session.start_recording(
+            "ios_simulator", "/tmp/ipad.mov", options={"udid": "IPAD-UDID"}
+        ),
+        session.start_recording(
+            "ios_simulator", "/tmp/iphone.mov", options={"udid": "IPHONE-UDID"}
+        ),
+    )
+
+    assert "session_id" in ipad
+    assert "session_id" in iphone
+    assert ipad["session_id"] != iphone["session_id"]
+    assert len(session.list_active_sessions()["sessions"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_rejects_duplicate_ios_simulator_device_recording() -> None:
+    async def create_process(*args, **kwargs):
+        return FakeProcess()
+
+    session = Session(create_process=create_process, run_precheck=False)
+    first = await session.start_recording(
+        "ios_simulator", "/tmp/one.mov", options={"udid": "SAME-UDID"}
+    )
+    duplicate = await session.start_recording(
+        "ios_simulator", "/tmp/two.mov", options={"device": "SAME-UDID"}
+    )
+
+    assert duplicate == {
+        "error": "already recording",
+        "existing_session_id": first["session_id"],
+    }
+
+
+@pytest.mark.asyncio
+async def test_recording_process_uses_devnull_to_avoid_pipe_deadlock() -> None:
+    captured_kwargs: list[dict] = []
+
+    async def create_process(*args, **kwargs):
+        captured_kwargs.append(kwargs)
+        return FakeProcess()
+
+    session = Session(create_process=create_process, run_precheck=False)
+
+    await session.start_recording("android", "/tmp/android.mp4")
+
+    assert captured_kwargs[0]["stdout"] == asyncio.subprocess.DEVNULL
+    assert captured_kwargs[0]["stderr"] == asyncio.subprocess.DEVNULL
 
 
 @pytest.mark.asyncio
@@ -539,6 +601,7 @@ def test_ios_command_uses_h264_display_option_and_device() -> None:
 @pytest.mark.asyncio
 async def test_android_stop_sends_sigint_pulls_and_cleans_remote() -> None:
     calls: list[tuple[str, ...]] = []
+    kwargs_list: list[dict] = []
     screenrecord = FakeProcess()
     stop = FakeProcess()
     pull = FakeProcess()
@@ -547,6 +610,7 @@ async def test_android_stop_sends_sigint_pulls_and_cleans_remote() -> None:
 
     async def create_process(*args, **kwargs):
         calls.append(tuple(args))
+        kwargs_list.append(kwargs)
         return processes.pop(0)
 
     session = Session(create_process=create_process, run_precheck=False)
@@ -596,3 +660,8 @@ async def test_android_stop_sends_sigint_pulls_and_cleans_remote() -> None:
     assert stopped["android_stop_exit_code"] == 0
     assert stopped["pull_exit_code"] == 0
     assert stopped["cleanup_exit_code"] == 0
+    assert all(
+        kwargs["stdout"] == asyncio.subprocess.DEVNULL
+        and kwargs["stderr"] == asyncio.subprocess.DEVNULL
+        for kwargs in kwargs_list
+    )

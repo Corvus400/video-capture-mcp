@@ -11,6 +11,10 @@ from video_capture_mcp.backends import android
 
 
 class ProcessLike(Protocol):
+    returncode: int | None
+
+    async def communicate(self) -> tuple[bytes, bytes]: ...
+
     async def wait(self) -> int: ...
 
 
@@ -122,10 +126,11 @@ async def _run_command(argv: list[str], create_process: CreateProcess) -> int:
     try:
         proc = await create_process(
             *argv,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
         )
-        return await proc.wait()
+        await proc.communicate()
+        return proc.returncode or 0
     except Exception:
         return -1
 

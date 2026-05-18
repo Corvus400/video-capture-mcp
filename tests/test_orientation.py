@@ -9,8 +9,10 @@ class FakeCommunicateProcess:
     def __init__(self, stdout: str = "", returncode: int = 0) -> None:
         self.returncode = returncode
         self._stdout = stdout.encode()
+        self.communicated = False
 
     async def communicate(self) -> tuple[bytes, bytes]:
+        self.communicated = True
         return self._stdout, b""
 
     async def wait(self) -> int:
@@ -106,6 +108,34 @@ async def test_normalize_video_orientation_raises_on_ffmpeg_failure(
         await orientation.normalize_video_orientation(
             str(video), "landscape", create_process=fake_create_process
         )
+
+
+@pytest.mark.asyncio
+async def test_normalize_video_orientation_drains_ffmpeg_stderr(
+    monkeypatch, tmp_path
+) -> None:
+    video = tmp_path / "in.mp4"
+    video.write_bytes(b"video")
+    ffmpeg = FakeCommunicateProcess(returncode=0)
+    calls: list[dict] = []
+
+    async def fake_probe_dimensions(*args, **kwargs):
+        return {"width": 720, "height": 1280}
+
+    async def fake_create_process(*args, **kwargs):
+        calls.append(kwargs)
+        return ffmpeg
+
+    monkeypatch.setattr(orientation, "probe_dimensions", fake_probe_dimensions)
+    monkeypatch.setattr(orientation.Path, "replace", lambda self, target: None)
+
+    await orientation.normalize_video_orientation(
+        str(video), "landscape", create_process=fake_create_process
+    )
+
+    assert calls[0]["stdout"] == orientation.asyncio.subprocess.DEVNULL
+    assert calls[0]["stderr"] == orientation.asyncio.subprocess.PIPE
+    assert ffmpeg.communicated is True
 
 
 def test_transpose_filter_rejects_zero() -> None:

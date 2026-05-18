@@ -9,6 +9,8 @@ from typing import Any, Awaitable, Callable, Protocol, cast
 
 
 class ProcessLike(Protocol):
+    returncode: int | None
+
     async def communicate(self) -> tuple[bytes, bytes]: ...
 
     async def wait(self) -> int: ...
@@ -56,14 +58,16 @@ async def normalize_video_orientation(
         "-metadata:s:v:0",
         "rotate=0",
         output,
-        stdout=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.PIPE,
     )
-    exit_code = await proc.wait()
+    _stdout, stderr = await proc.communicate()
+    exit_code = proc.returncode
     if exit_code != 0:
         Path(output).unlink(missing_ok=True)
+        message = stderr.decode("utf-8", errors="replace").strip()[:500]
         raise OrientationError(
-            f"ffmpeg orientation normalization failed with exit code {exit_code}"
+            f"ffmpeg orientation normalization failed (exit={exit_code}): {message}"
         )
     Path(output).replace(path)
     after = await probe_dimensions(path, create_process=create_process)

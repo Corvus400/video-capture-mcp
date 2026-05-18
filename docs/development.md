@@ -52,7 +52,7 @@ ls dist/
 Verify the wheel with `uvx`:
 
 ```bash
-uvx --from ./dist/video_capture_mcp-0.1.0-py3-none-any.whl video-capture-mcp < /dev/null
+uvx --from ./dist/video_capture_mcp-0.1.1-py3-none-any.whl video-capture-mcp < /dev/null
 ```
 
 ## MCP Smoke Test
@@ -74,5 +74,5 @@ Before release, run:
 ```bash
 ./.venv/bin/python -m pytest tests/ -v
 python3 -m build --sdist --wheel
-uvx --from ./dist/video_capture_mcp-0.1.0-py3-none-any.whl video-capture-mcp < /dev/null
+uvx --from ./dist/video_capture_mcp-0.1.1-py3-none-any.whl video-capture-mcp < /dev/null
 ```
