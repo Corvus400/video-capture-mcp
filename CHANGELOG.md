@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/Corvus400/video-capture-mcp/compare/v0.2.1...v0.3.0) (2026-05-18)
+
+
+### Features
+
+* enrich MCP server instructions and tool descriptions for client LLM guidance ([cf42cbb](https://github.com/Corvus400/video-capture-mcp/commit/cf42cbbebb97f0890aee3284f0360fd0bdd7d5f9))
+
 ## [0.2.1](https://github.com/Corvus400/video-capture-mcp/compare/v0.2.0...v0.2.1) (2026-05-18)
 
 
