@@ -1,6 +1,12 @@
 name: update-homebrew
 
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release tag, for example v0.1.0"
+        required: true
+        type: string
   release:
     types: [published]
 
@@ -14,7 +20,7 @@ jobs:
       - name: Dispatch tap update
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.version }}
         run: |
           gh workflow run update-formula.yml \
             --repo Corvus400/homebrew-video-capture-mcp \
