@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/Corvus400/video-capture-mcp/compare/v0.3.0...v0.4.0) (2026-05-18)
+
+
+### Features
+
+* **mcp:** add parameter guidance for client LLMs ([01aa8ef](https://github.com/Corvus400/video-capture-mcp/commit/01aa8ef9db806686e7db55ecf9d12babeb331a4a))
+
 ## [0.3.0](https://github.com/Corvus400/video-capture-mcp/compare/v0.2.1...v0.3.0) (2026-05-18)
 
 
