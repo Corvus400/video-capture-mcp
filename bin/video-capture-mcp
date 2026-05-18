@@ -2,4 +2,30 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec "${ROOT_DIR}/.venv/bin/python" -m video_capture_mcp.server "$@"
+PYTHON_BIN="${ROOT_DIR}/.venv/bin/python"
+
+SOURCE_VERSION="$("${PYTHON_BIN}" - "${ROOT_DIR}/pyproject.toml" <<'PY'
+import sys
+import tomllib
+
+with open(sys.argv[1], "rb") as file:
+    print(tomllib.load(file)["project"]["version"])
+PY
+)"
+INSTALLED_VERSION="$("${PYTHON_BIN}" - <<'PY'
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version
+
+try:
+    print(version("video-capture-mcp"))
+except PackageNotFoundError:
+    print("")
+PY
+)"
+
+if [[ "${INSTALLED_VERSION}" != "${SOURCE_VERSION}" ]]; then
+  echo "Updating video-capture-mcp editable install metadata: ${INSTALLED_VERSION:-none} -> ${SOURCE_VERSION}" >&2
+  "${PYTHON_BIN}" -m pip install -q -e "${ROOT_DIR}" >&2
+fi
+
+exec "${PYTHON_BIN}" -m video_capture_mcp.server "$@"

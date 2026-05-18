@@ -18,6 +18,11 @@ The installer creates `.venv`, installs the package editable with test dependenc
 exec .venv/bin/python -m video_capture_mcp.server
 ```
 
+Before starting the server, the wrapper compares the source version in
+`pyproject.toml` with the editable install metadata in `.venv`. If the metadata
+is stale after a version bump, it refreshes the editable install first so local
+version checks and the running source agree.
+
 Published installs use the `video-capture-mcp` console script generated from `pyproject.toml`.
 
 ## Tests
