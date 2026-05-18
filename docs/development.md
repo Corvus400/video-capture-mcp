@@ -67,6 +67,12 @@ printf '%s\n%s\n%s\n' \
   | ./.venv/bin/python -m video_capture_mcp.server
 ```
 
+For a local macOS manual-recording smoke test, start a macOS or app-window
+recording without `duration_seconds`, perform a short UI action, then call
+`stop_recording` and confirm the result reports `file_exists=true` and a
+non-zero `file_size_bytes`. Write smoke-test videos outside the repository, for
+example under `/private/tmp`.
+
 ## Release Checks
 
 Before release, run:

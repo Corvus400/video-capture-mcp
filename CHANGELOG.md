@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Allow macOS full-screen and app-window recordings to run until explicit
+  `stop_recording`, matching the iOS Simulator and Android workflow.
+- Add `stop_all_recordings` for clearing active sessions when a client loses a
+  session id.
+- Add macOS `include_cursor` support and stop-result file metadata.
+
 ## [0.1.1] - 2026-05-18
 
 ### Fixed
@@ -20,8 +30,6 @@
 ### Documentation
 
 * rewrite README and add permissions/troubleshooting/development guides ([f3f5d0f](https://github.com/Corvus400/video-capture-mcp/commit/f3f5d0faaa6f7ffb6d4ae5d479131becd7de0234))
-
-## [Unreleased]
 
 ## [0.1.0] - 2026-05-18
 

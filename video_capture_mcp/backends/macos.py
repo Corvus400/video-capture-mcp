@@ -48,15 +48,15 @@ def build_command(
     duration_seconds: float | int | None,
     options: dict[str, Any] | None = None,
 ) -> list[str]:
-    if duration_seconds is None:
-        raise BackendError(
-            "macOS recording requires duration_seconds because screencapture uses -V."
-        )
-    if duration_seconds <= 0:
+    if duration_seconds is not None and duration_seconds <= 0:
         raise BackendError("duration_seconds must be greater than zero.")
 
     Path(output_path).expanduser().parent.mkdir(parents=True, exist_ok=True)
-    args = ["screencapture", "-V", str(int(duration_seconds))]
+    args = ["screencapture", "-v"]
+    if duration_seconds is not None:
+        args.extend(["-V", str(int(duration_seconds))])
+    if (options or {}).get("include_cursor"):
+        args.append("-C")
     region = (options or {}).get("region")
     if region is not None:
         args.extend(["-R", _format_region(region)])

@@ -99,7 +99,23 @@ async def test_stop_recording_sends_sigint_for_ios(
 
 
 @pytest.mark.asyncio
-async def test_stop_recording_waits_without_sigint_for_macos() -> None:
+async def test_stop_recording_sends_sigint_for_manual_macos() -> None:
+    process = FakeProcess()
+
+    async def create_process(*args, **kwargs):
+        return process
+
+    session = Session(create_process=create_process, run_precheck=False)
+    result = await session.start_recording("macos", "/tmp/test.mov")
+
+    await session.stop_recording(result["session_id"])
+
+    assert result["mode"] == "manual_stop"
+    assert process.signals == [signal.SIGINT]
+
+
+@pytest.mark.asyncio
+async def test_stop_recording_can_interrupt_scheduled_macos() -> None:
     process = FakeProcess()
 
     async def create_process(*args, **kwargs):
@@ -110,7 +126,8 @@ async def test_stop_recording_waits_without_sigint_for_macos() -> None:
 
     await session.stop_recording(result["session_id"])
 
-    assert process.signals == []
+    assert result["mode"] == "scheduled"
+    assert process.signals == [signal.SIGINT]
 
 
 @pytest.mark.asyncio
@@ -129,6 +146,8 @@ async def test_stop_recording_reports_no_orientation_when_not_requested() -> Non
         "normalized": False,
         "reason": "orientation not requested",
     }
+    assert stopped["file_exists"] is False
+    assert stopped["file_size_bytes"] is None
 
 
 @pytest.mark.asyncio
@@ -262,6 +281,60 @@ async def test_close_stops_active_ios_session(
     assert process.signals == [signal.SIGINT]
     assert session.list_active_sessions() == {"sessions": []}
     assert not list(tmp_path.glob("server-*.json"))
+
+
+@pytest.mark.asyncio
+async def test_stop_all_recordings_stops_current_sessions(tmp_path) -> None:
+    first = FakeProcess()
+    second = FakeProcess()
+    processes = [first, second]
+
+    async def create_process(*args, **kwargs):
+        return processes.pop(0)
+
+    session = Session(
+        create_process=create_process, run_precheck=False, registry_dir=tmp_path
+    )
+    mac = await session.start_recording("macos", "/tmp/mac.mov")
+    ios_started = await session.start_recording(
+        "ios_simulator", "/tmp/ios.mov", options={"udid": "IPHONE"}
+    )
+
+    result = await session.stop_all_recordings()
+
+    assert {item["session_id"] for item in result["stopped"]} == {
+        mac["session_id"],
+        ios_started["session_id"],
+    }
+    assert first.signals == [signal.SIGINT]
+    assert second.signals == [signal.SIGINT]
+    assert session.list_active_sessions() == {"sessions": []}
+    assert not list(tmp_path.glob("server-*.json"))
+
+
+@pytest.mark.asyncio
+async def test_stop_all_recordings_can_filter_by_target() -> None:
+    first = FakeProcess()
+    second = FakeProcess()
+    processes = [first, second]
+
+    async def create_process(*args, **kwargs):
+        return processes.pop(0)
+
+    session = Session(create_process=create_process, run_precheck=False)
+    mac = await session.start_recording("macos", "/tmp/mac.mov")
+    ios_started = await session.start_recording(
+        "ios_simulator", "/tmp/ios.mov", options={"udid": "IPHONE"}
+    )
+
+    result = await session.stop_all_recordings("mac")
+
+    assert [item["session_id"] for item in result["stopped"]] == [mac["session_id"]]
+    assert first.signals == [signal.SIGINT]
+    assert second.signals == []
+    assert [
+        active["session_id"] for active in session.list_active_sessions()["sessions"]
+    ] == [ios_started["session_id"]]
 
 
 @pytest.mark.asyncio
@@ -493,6 +566,47 @@ async def test_start_app_window_recording_uses_shared_default_output_root(
         tmp_path / "video_capture_google_chrome_window.mov"
     )
     assert calls[0][1] == str(tmp_path / "video_capture_google_chrome_window.mov")
+
+
+@pytest.mark.asyncio
+async def test_start_app_window_recording_allows_manual_stop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    window_region = {
+        "visible": True,
+        "region": {"x": 100, "y": -1302, "width": 1200, "height": 1276},
+    }
+    calls: list[tuple[str, str | None, float | None, dict]] = []
+
+    async def fake_get_window_region(*args, **kwargs):
+        return window_region
+
+    class FakeSessionForServer:
+        async def start_recording(self, target, output_path, duration_seconds, options):
+            calls.append((target, output_path, duration_seconds, options))
+            return {
+                "session_id": "session-1",
+                "video_path": output_path,
+                "mode": "manual_stop",
+            }
+
+    monkeypatch.setattr(server, "get_app_window_region", fake_get_window_region)
+    monkeypatch.setattr(server, "_session", FakeSessionForServer())
+
+    result = await server.start_app_window_recording(
+        "Google Chrome",
+        output_path="/tmp/chrome.mov",
+    )
+
+    assert result["mode"] == "manual_stop"
+    assert calls == [
+        (
+            "macos",
+            "/tmp/chrome.mov",
+            None,
+            {"region": {"x": 100, "y": -1302, "width": 1200, "height": 1276}},
+        )
+    ]
 
 
 @pytest.mark.asyncio
