@@ -21,6 +21,17 @@ def test_server_instructions_cover_critical_sections() -> None:
         assert marker in instructions, f"instructions missing section: {marker}"
 
 
+def test_instructions_cover_new_sections() -> None:
+    instructions = server_module.mcp._mcp_server.instructions
+    for marker in (
+        "Frame extraction context cost",
+        "xcode-select --install",
+        "fully restart the MCP client",
+        "uvx --from video-capture-mcp python",
+    ):
+        assert marker in instructions, f"instructions missing: {marker}"
+
+
 def _tool_descriptions() -> dict[str, str]:
     return {
         tool.name: tool.description
@@ -56,3 +67,30 @@ def test_hover_sequence_description_mentions_app_name_and_no_click() -> None:
     desc = _tool_descriptions()["hover_sequence"]
     assert "app_name" in desc
     assert "click" in desc.lower()  # explains that it does NOT click
+
+
+def test_tool_parameters_have_descriptions() -> None:
+    tools = server_module.mcp._tool_manager.list_tools()
+    missing: list[str] = []
+    for tool in tools:
+        schema = tool.parameters
+        props = schema.get("properties", {})
+        for pname, pschema in props.items():
+            if not pschema.get("description"):
+                missing.append(f"{tool.name}.{pname}")
+    assert not missing, f"parameters lacking description: {missing}"
+
+
+def test_extract_frames_inline_images_warns_about_context() -> None:
+    tools = {t.name: t for t in server_module.mcp._tool_manager.list_tools()}
+    schema = tools["extract_frames"].parameters
+    inline = schema["properties"]["inline_images"]["description"]
+    assert "context" in inline.lower()
+    assert "false" in inline.lower()
+
+
+def test_hover_sequence_points_format_explicit() -> None:
+    tools = {t.name: t for t in server_module.mcp._tool_manager.list_tools()}
+    pts = tools["hover_sequence"].parameters["properties"]["points"]["description"]
+    assert '{"x"' in pts or '"x"' in pts
+    assert "[x, y]" in pts or "x, y" in pts

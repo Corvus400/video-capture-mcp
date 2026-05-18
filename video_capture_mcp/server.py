@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from typing import Any
+from typing import Annotated, Any
 
 from mcp.server.fastmcp import FastMCP
+from pydantic import Field
 
 from video_capture_mcp import __version__
 from video_capture_mcp.extractor import extract_frames as extract_video_frames
@@ -49,9 +50,10 @@ android -> adb shell screenrecord
 
 # Permissions (macOS only; required before first use)
 - Screen Recording: required for target=macos and start_app_window_recording. System Settings -> Privacy & Security -> Screen Recording -> add the launcher process -> fully restart the MCP client.
-- Accessibility: required for move_pointer and hover_sequence. Same flow under Accessibility.
+- Accessibility: required for move_pointer and hover_sequence. Same flow under Accessibility -> add the launcher process -> fully restart the MCP client.
 - iOS Simulator and Android do NOT need Screen Recording (they use xcrun simctl / adb).
 - ffmpeg and ffprobe must be on PATH for extract_frames and orientation normalization. Install with `brew install ffmpeg`.
+- If you need to know which binary to add: for uvx run `uvx --from video-capture-mcp python -c "import sys; print(sys.executable)"`; for pip or Homebrew use `which video-capture-mcp` (then realpath the result).
 - If a recording or pointer tool fails with TCC denial, the agent cannot self-recover; surface the error to the user with the System Settings path.
 
 # Output paths
@@ -61,6 +63,7 @@ android -> adb shell screenrecord
 # Common failure modes and recovery
 - "TCC permission required" -> surface to user; agent cannot grant permission.
 - "ffmpeg failed" or "No such file or directory: ffprobe" -> install ffmpeg via brew.
+- "xcrun simctl ... failed" or "no such command: xcrun" -> install Xcode Command Line Tools via `xcode-select --install`.
 - "no booted simulator" -> xcrun simctl boot <UDID>, or pass options.udid.
 - iOS multi-simulator -> always pass options.udid explicitly.
 - "no Android device" / unauthorized -> ask user to accept the USB-debugging prompt, then adb kill-server && adb start-server. Always pass options.serial when more than one device is attached.
@@ -70,6 +73,9 @@ android -> adb shell screenrecord
 - Do not call start_recording target=macos for a single visible app window; use start_app_window_recording so only that window region is captured.
 - Do not chain stop_recording calls without checking file_size_bytes; an empty file means the backend never wrote anything.
 - Do not pass relative output_path; prefer absolute paths under VIDEO_CAPTURE_MCP_OUTPUT_DIR.
+
+# Frame extraction context cost
+- extract_frames returns inline PNG content when inline_images=True (default). Each PNG can be hundreds of KB. With max_frames=50 this can saturate the client LLM context. For long agent runs, pass inline_images=false and read frames from output_dir on demand.
 """
 
 mcp = FastMCP("video_capture", instructions=SERVER_INSTRUCTIONS)
@@ -78,10 +84,47 @@ _session = Session()
 
 @mcp.tool()
 async def start_recording(
-    target: str,
-    duration_seconds: float | None = None,
-    output_path: str | None = None,
-    options: dict[str, Any] | None = None,
+    target: Annotated[
+        str,
+        Field(
+            description=(
+                "Backend alias: 'macos'/'mac'/'desktop' for screencapture, "
+                "'ios_simulator'/'ios'/'simulator' for xcrun simctl, "
+                "'android' for adb."
+            )
+        ),
+    ],
+    duration_seconds: Annotated[
+        float | None,
+        Field(
+            description=(
+                "Seconds to record. Omit for manual-stop workflow "
+                "(call stop_recording later)."
+            )
+        ),
+    ] = None,
+    output_path: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Absolute path for the output file. Defaults to "
+                "$VIDEO_CAPTURE_MCP_OUTPUT_DIR or system temp under "
+                "video-capture-mcp."
+            )
+        ),
+    ] = None,
+    options: Annotated[
+        dict[str, Any] | None,
+        Field(
+            description=(
+                "Backend-specific dict. macOS: "
+                "region/display/include_cursor/include_clicks/include_audio. "
+                "iOS Simulator: device/udid/display. Android: "
+                "serial/size/bit_rate. Cross-backend: orientation, "
+                "rotate_degrees."
+            )
+        ),
+    ] = None,
 ) -> dict[str, Any]:
     """Start recording a macOS, iOS Simulator, or Android screen target.
 
@@ -110,7 +153,17 @@ async def start_recording(
 
 
 @mcp.tool()
-async def stop_recording(session_id: str) -> dict[str, Any]:
+async def stop_recording(
+    session_id: Annotated[
+        str,
+        Field(
+            description=(
+                "session_id returned by start_recording or "
+                "start_app_window_recording."
+            )
+        ),
+    ],
+) -> dict[str, Any]:
     """Stop one manual recording session and verify the produced file.
 
     Call this after start_recording or start_app_window_recording returned a
@@ -129,7 +182,15 @@ async def stop_recording(session_id: str) -> dict[str, Any]:
 
 @mcp.tool()
 async def stop_all_recordings(
-    target: str | None = None,
+    target: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Optional target alias filter (same vocabulary as "
+                "start_recording.target). Omit to stop every session."
+            )
+        ),
+    ] = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Stop all live recording sessions for this server process.
 
@@ -171,7 +232,26 @@ async def cleanup_stale_processes() -> dict[str, list[dict[str, Any]]]:
 
 
 @mcp.tool()
-async def move_pointer(x: float, y: float) -> dict[str, float]:
+async def move_pointer(
+    x: Annotated[
+        float,
+        Field(
+            description=(
+                "macOS screen x in points (logical pixels), origin = top-left "
+                "of primary display."
+            )
+        ),
+    ],
+    y: Annotated[
+        float,
+        Field(
+            description=(
+                "macOS screen y in points (logical pixels), origin = top-left "
+                "of primary display."
+            )
+        ),
+    ],
+) -> dict[str, float]:
     """Move the macOS pointer to one coordinate without clicking.
 
     Requires macOS Accessibility permission for the launcher process. Use this
@@ -187,11 +267,40 @@ async def move_pointer(x: float, y: float) -> dict[str, float]:
 
 @mcp.tool()
 async def hover_sequence(
-    points: list[Any],
-    hold_seconds: float = 0.5,
-    app_name: str | None = None,
-    steps_per_segment: int = 12,
-    step_delay_seconds: float = 0.02,
+    points: Annotated[
+        list[Any],
+        Field(
+            description=(
+                "List of waypoints in macOS screen-point coordinates "
+                '(origin top-left). Each item must be a {"x": number, '
+                '"y": number} dict OR a [x, y] pair.'
+            )
+        ),
+    ],
+    hold_seconds: Annotated[
+        float,
+        Field(description="Pause at each waypoint after arrival. Default 0.5s."),
+    ] = 0.5,
+    app_name: Annotated[
+        str | None,
+        Field(
+            description=(
+                "macOS app to activate before moving. Omit if no activation " "needed."
+            )
+        ),
+    ] = None,
+    steps_per_segment: Annotated[
+        int,
+        Field(
+            description=(
+                "Interpolation density between successive waypoints. Default 12."
+            )
+        ),
+    ] = 12,
+    step_delay_seconds: Annotated[
+        float,
+        Field(description=("Pause between interpolated micro-steps. Default 0.02s.")),
+    ] = 0.02,
 ) -> dict[str, Any]:
     """Move the macOS pointer through hover/unhover points without clicking.
 
@@ -223,10 +332,32 @@ async def hover_sequence(
 
 @mcp.tool()
 async def get_window_region(
-    app_name: str,
-    padding: int = 0,
-    min_visible_ratio: float = 0.8,
-    activate: bool = True,
+    app_name: Annotated[
+        str,
+        Field(description="Exact macOS application name (e.g. 'Google Chrome')."),
+    ],
+    padding: Annotated[
+        int,
+        Field(description="Pixels added to all sides of the window region. Default 0."),
+    ] = 0,
+    min_visible_ratio: Annotated[
+        float,
+        Field(
+            description=(
+                "Minimum visible_ratio to treat the window as usable. "
+                "0.0-1.0, default 0.8."
+            )
+        ),
+    ] = 0.8,
+    activate: Annotated[
+        bool,
+        Field(
+            description=(
+                "Activate the app before measurement. Set False only when "
+                "measuring a background window intentionally."
+            )
+        ),
+    ] = True,
 ) -> dict[str, Any]:
     """Return the visible front-window region for a macOS app.
 
@@ -249,12 +380,40 @@ async def get_window_region(
 
 @mcp.tool()
 async def start_app_window_recording(
-    app_name: str,
-    duration_seconds: float | None = None,
-    output_path: str | None = None,
-    padding: int = 0,
-    min_visible_ratio: float = 0.8,
-    options: dict[str, Any] | None = None,
+    app_name: Annotated[
+        str,
+        Field(description="Exact macOS application name (e.g. 'Google Chrome')."),
+    ],
+    duration_seconds: Annotated[
+        float | None,
+        Field(description="Seconds to record. Omit for manual-stop workflow."),
+    ] = None,
+    output_path: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Absolute path. When omitted, defaults to "
+                "default_output_root()/video_capture_<app_name>_window.mov."
+            )
+        ),
+    ] = None,
+    padding: Annotated[
+        int,
+        Field(description="Pixels added to the window region. Default 0."),
+    ] = 0,
+    min_visible_ratio: Annotated[
+        float,
+        Field(description="Minimum visible_ratio. 0.0-1.0, default 0.8."),
+    ] = 0.8,
+    options: Annotated[
+        dict[str, Any] | None,
+        Field(
+            description=(
+                "Forwarded to macOS backend (after region injection). Same "
+                "keys as start_recording.options minus region."
+            )
+        ),
+    ] = None,
 ) -> dict[str, Any]:
     """Start recording only the visible front-window region of a macOS app.
 
@@ -298,14 +457,66 @@ async def start_app_window_recording(
 
 @mcp.tool()
 async def extract_frames(
-    video_path: str,
-    output_dir: str,
-    mode: str = "scene",
-    scene_threshold: float = 0.1,
-    fps: float | None = None,
-    max_frames: int = 50,
-    inline_images: bool = True,
-    rotate_degrees: int | None = None,
+    video_path: Annotated[
+        str,
+        Field(description="Absolute path to the recorded .mov / .mp4."),
+    ],
+    output_dir: Annotated[
+        str,
+        Field(description="Absolute directory to write PNG frames into."),
+    ],
+    mode: Annotated[
+        str,
+        Field(
+            description=(
+                "Frame selection: 'scene' (visual-change keyframes) or "
+                "'fixed_fps' (sample at fps)."
+            )
+        ),
+    ] = "scene",
+    scene_threshold: Annotated[
+        float,
+        Field(
+            description=(
+                "ffmpeg scene threshold for mode='scene'. Range 0.0-1.0. "
+                "Lower = more frames. Default 0.1."
+            )
+        ),
+    ] = 0.1,
+    fps: Annotated[
+        float | None,
+        Field(
+            description="Sampling rate for mode='fixed_fps'. Ignored when mode='scene'."
+        ),
+    ] = None,
+    max_frames: Annotated[
+        int,
+        Field(
+            description=(
+                "Upper bound on returned frames. Excess reported as "
+                "dropped_for_max. Default 50."
+            )
+        ),
+    ] = 50,
+    inline_images: Annotated[
+        bool,
+        Field(
+            description=(
+                "When true (default), embed PNGs as FastMCP Image content. "
+                "WARNING: 50 inline PNGs can exhaust LLM context - set false "
+                "and rely on output_dir paths for long sessions."
+            )
+        ),
+    ] = True,
+    rotate_degrees: Annotated[
+        int | None,
+        Field(
+            description=(
+                "Apply orientation normalization (0/90/180/270). Use only "
+                "when the recording came out sideways."
+            )
+        ),
+    ] = None,
 ) -> dict[str, Any]:
     """Extract key frames or fixed-rate frames from a recorded video.
 
@@ -335,11 +546,41 @@ async def extract_frames(
 
 @mcp.tool()
 async def record_and_extract(
-    target: str,
-    duration_seconds: float,
-    output_dir: str,
-    options: dict[str, Any] | None = None,
-    extract_options: dict[str, Any] | None = None,
+    target: Annotated[
+        str,
+        Field(description="Same vocabulary as start_recording.target."),
+    ],
+    duration_seconds: Annotated[
+        float,
+        Field(
+            description=(
+                "Required. This tool has no manual-stop path; use "
+                "start_recording + stop_recording for unknown-duration captures."
+            )
+        ),
+    ],
+    output_dir: Annotated[
+        str,
+        Field(
+            description=(
+                "Absolute directory. Receives recording.mov (macOS/iOS) or "
+                "recording.mp4 (Android) plus a frames/ subdir."
+            )
+        ),
+    ],
+    options: Annotated[
+        dict[str, Any] | None,
+        Field(description="Forwarded to start_recording.options."),
+    ] = None,
+    extract_options: Annotated[
+        dict[str, Any] | None,
+        Field(
+            description=(
+                "Forwarded to extract_frames. Accepts mode, scene_threshold, "
+                "fps, max_frames, inline_images, rotate_degrees."
+            )
+        ),
+    ] = None,
 ) -> dict[str, Any]:
     """Record a target for a fixed duration and extract frames in one call.
 
