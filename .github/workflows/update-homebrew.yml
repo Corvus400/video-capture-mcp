@@ -17,11 +17,12 @@ jobs:
   update-homebrew:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Dispatch tap update
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           RELEASE_TAG: ${{ github.event.release.tag_name || inputs.version }}
-        run: |
-          gh workflow run update-formula.yml \
-            --repo Corvus400/homebrew-video-capture-mcp \
-            -f version="${RELEASE_TAG}"
+        run: >
+          python scripts/release_coordinator.py dispatch-homebrew-tap
+          --tap-repo Corvus400/homebrew-video-capture-mcp
+          --version "${RELEASE_TAG}"
