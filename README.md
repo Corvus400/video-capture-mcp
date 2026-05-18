@@ -8,12 +8,13 @@
 [![Python](https://img.shields.io/badge/python-3.11--3.12-blue.svg)](pyproject.toml)
 [![macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)](docs/permissions.md)
 
-`video-capture-mcp` gives AI agents a stdio MCP server for recording short UI flows, checking macOS app-window visibility, moving the pointer for hover demos without clicking, and extracting frames with ffmpeg.
+`video-capture-mcp` gives AI agents a stdio MCP server for recording UI motion while they operate apps, then extracting frames with ffmpeg. It is designed for bugs and requirements that screenshots miss, such as keyboards opening, hover/unhover states, and transient layout glitches.
 
 ## Features
 
 - 3 OS recording backends in one MCP server: macOS, iOS Simulator, and Android.
 - App-window-bounded macOS recording with activation and visible-region checks.
+- Manual start/stop recording across macOS, iOS Simulator, and Android.
 - Hover sequence API for UI demos that need mouse movement without clicks.
 - `record_and_extract` for one-shot recording plus ffmpeg key-frame extraction.
 - FastMCP `Image` inline responses for extracted frames.
@@ -129,14 +130,19 @@ See [docs/permissions.md](docs/permissions.md) for full details.
    claude mcp add --scope user --transport stdio video_capture -- uvx video-capture-mcp
    ```
 
-3. Ask Claude Code to call `mcp__video_capture__start_app_window_recording` with:
+3. Ask Claude Code to start recording a visible app window:
 
    ```json
    {
      "app_name": "Finder",
-     "duration_seconds": 3
+     "options": {
+       "include_cursor": true
+     }
    }
    ```
+
+4. Have the agent operate the UI, then call `mcp__video_capture__stop_recording`
+   with the returned `session_id`.
 
 ## Tools
 
@@ -144,7 +150,8 @@ See [docs/permissions.md](docs/permissions.md) for full details.
 | --- | --- | --- |
 | `start_recording` | Start recording on selected target | `target`, `duration_seconds`, `options` |
 | `stop_recording` | Stop a session and normalize orientation | `session_id` |
-| `start_app_window_recording` | macOS app-window-bounded recording | `app_name`, `duration_seconds` |
+| `stop_all_recordings` | Stop active sessions, optionally by target | `target` |
+| `start_app_window_recording` | macOS app-window-bounded recording | `app_name`, `duration_seconds`, `options` |
 | `get_window_region` | Activate and measure front-window visibility | `app_name`, `min_visible_ratio` |
 | `hover_sequence` | Mouse-move sequence without clicks | `points`, `hold_seconds`, `app_name` |
 | `move_pointer` | Single mouse-move without click | `x`, `y` |

@@ -32,7 +32,7 @@ async def start_recording(
     start_app_window_recording so the target app's visible window is checked and
     only that window region is recorded. Use target="macos" here only when a
     full desktop recording is intentionally needed or when options.region is
-    already known.
+    already known. Omitting duration_seconds starts a manual-stop recording.
     """
     return await _session.start_recording(
         target, output_path, duration_seconds, options
@@ -43,6 +43,14 @@ async def start_recording(
 async def stop_recording(session_id: str) -> dict[str, Any]:
     """Stop a running recording session."""
     return await _session.stop_recording(session_id)
+
+
+@mcp.tool()
+async def stop_all_recordings(
+    target: str | None = None,
+) -> dict[str, list[dict[str, Any]]]:
+    """Stop all running recording sessions, optionally filtered by target."""
+    return await _session.stop_all_recordings(target)
 
 
 @mcp.tool()
@@ -120,7 +128,7 @@ async def get_window_region(
 @mcp.tool()
 async def start_app_window_recording(
     app_name: str,
-    duration_seconds: float,
+    duration_seconds: float | None = None,
     output_path: str | None = None,
     padding: int = 0,
     min_visible_ratio: float = 0.8,
@@ -131,7 +139,8 @@ async def start_app_window_recording(
     Preferred for Chrome/Safari/desktop-app debugging. It first activates the
     target app, verifies the target front window is sufficiently visible, then
     records only that visible region via screencapture -R instead of recording
-    the full desktop.
+    the full desktop. Omitting duration_seconds records until stop_recording is
+    called.
     """
     window_region = await get_app_window_region(
         app_name,

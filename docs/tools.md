@@ -9,7 +9,7 @@ Start a recording session.
 Parameters:
 
 - `target`: `macos`, `ios_simulator`, `ios`, `ios-simulator`, `simulator`, `mac`, `desktop`, or `android`.
-- `duration_seconds`: required for macOS because `screencapture -V` is scheduled; optional for iOS Simulator and Android.
+- `duration_seconds`: optional for macOS, iOS Simulator, and Android. Omit it when the agent should explicitly stop recording after operating the UI.
 - `output_path`: optional local video path. If omitted, the server uses `VIDEO_CAPTURE_MCP_OUTPUT_DIR` or the system temp directory.
 - `options`: backend-specific options.
 
@@ -22,6 +22,7 @@ macOS options:
 
 - `region`: dict `{ "x": int, "y": int, "width": int, "height": int }` or four-item list.
 - `display`: display id passed to `screencapture -D`.
+- `include_cursor`: include the pointer in macOS recordings.
 - `include_clicks`: include clicks in the recording.
 - `include_audio`: include audio in the recording.
 
@@ -71,6 +72,25 @@ Parameters:
 - `session_id`: id returned by `start_recording`.
 
 Returns the final local `video_path`, elapsed duration, backend exit code, and orientation result. Android sessions also include remote pull and cleanup exit codes.
+All targets include `file_exists` and `file_size_bytes` so agents can detect empty or missing recordings before analyzing frames.
+
+## `stop_all_recordings`
+
+Stop all running sessions for the current MCP server.
+
+Parameters:
+
+- `target`: optional target filter. Accepts the same target aliases as `start_recording`.
+
+Returns:
+
+```json
+{
+  "stopped": []
+}
+```
+
+Use this when a client lost a `session_id`, when duplicate-target protection reports an active session that should be cleared, or before starting a new demo capture.
 
 ## `start_app_window_recording`
 
@@ -79,13 +99,15 @@ Record only the visible front-window region of a macOS app.
 Parameters:
 
 - `app_name`: macOS application name, for example `Google Chrome`.
-- `duration_seconds`: scheduled recording length.
+- `duration_seconds`: optional scheduled recording length. Omit it to record until `stop_recording`.
 - `output_path`: optional local `.mov` path.
 - `padding`: optional region padding.
 - `min_visible_ratio`: required visible ratio, default `0.8`.
 - `options`: extra macOS recording options.
 
 The tool activates the app, checks visible window bounds, and records using a `screencapture -R` region. If the window is not sufficiently visible, it returns an error object and does not start recording.
+
+For agent-driven UI verification, prefer omitting `duration_seconds`: start recording, operate the app with Computer Use or another UI tool, then call `stop_recording` with the returned `session_id`.
 
 ## `get_window_region`
 

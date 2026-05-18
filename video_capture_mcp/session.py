@@ -113,7 +113,11 @@ class Session:
                 )
             except Exception as exc:
                 return {"error": str(exc), "target": target}
-            mode = "scheduled" if target == "macos" else "manual_stop"
+            mode = (
+                "scheduled"
+                if target == "macos" and duration_seconds is not None
+                else "manual_stop"
+            )
             session_id = uuid.uuid4().hex
             active = ActiveSession(
                 session_id=session_id,
@@ -142,7 +146,10 @@ class Session:
 
         try:
             android_stop_exit_code = None
-            if active.target == "ios_simulator" and active.process.returncode is None:
+            if (
+                active.target in {"ios_simulator", "macos"}
+                and active.process.returncode is None
+            ):
                 active.process.send_signal(signal.SIGINT)
             if active.target == "android" and active.process.returncode is None:
                 android_stop_exit_code = await self._run_command(
@@ -168,11 +175,14 @@ class Session:
                 rotate_degrees=active.options.get("rotate_degrees"),
             )
             duration = (datetime.now(timezone.utc) - active.started_at).total_seconds()
+            file_size = _file_size(active.video_path)
             result = {
                 "video_path": active.video_path,
                 "duration_seconds": duration,
                 "exit_code": exit_code,
                 "orientation": orientation_result,
+                "file_exists": file_size is not None,
+                "file_size_bytes": file_size,
             }
             if active.target == "android":
                 result["remote_path"] = active.remote_path
@@ -182,6 +192,22 @@ class Session:
             return result
         finally:
             self._forget_session(active)
+
+    async def stop_all_recordings(
+        self, target: str | None = None
+    ) -> dict[str, list[dict[str, Any]]]:
+        self._reap_finished_sessions()
+        normalized_target = _normalize_target(target) if target is not None else None
+        session_ids = [
+            active.session_id
+            for active in self._sessions.values()
+            if normalized_target is None or active.target == normalized_target
+        ]
+        stopped = []
+        for session_id in session_ids:
+            result = await self.stop_recording(session_id)
+            stopped.append({"session_id": session_id, **result})
+        return {"stopped": stopped}
 
     def list_active_sessions(self) -> dict[str, list[dict[str, Any]]]:
         self._reap_finished_sessions()
@@ -304,3 +330,10 @@ def _default_output_path(target: str) -> str:
     path = default_output_root() / f"video_capture_{target}_{uuid.uuid4().hex}{suffix}"
     path.parent.mkdir(parents=True, exist_ok=True)
     return os.fspath(path)
+
+
+def _file_size(path: str) -> int | None:
+    try:
+        return Path(path).expanduser().stat().st_size
+    except OSError:
+        return None

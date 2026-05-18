@@ -15,12 +15,15 @@ class FakeCommunicateProcess:
         return self._stdout, self._stderr
 
 
-def test_macos_build_command_requires_duration() -> None:
-    with pytest.raises(macos.BackendError):
-        macos.build_command("/tmp/out.mov", None)
+def test_macos_build_command_allows_manual_stop_recording(tmp_path) -> None:
+    output = tmp_path / "out.mov"
+
+    command = macos.build_command(str(output), None)
+
+    assert command == ["screencapture", "-v", str(output)]
 
 
-def test_macos_build_command_formats_region_and_flags(tmp_path) -> None:
+def test_macos_build_command_formats_scheduled_region_and_flags(tmp_path) -> None:
     output = tmp_path / "out.mov"
 
     command = macos.build_command(
@@ -29,6 +32,7 @@ def test_macos_build_command_formats_region_and_flags(tmp_path) -> None:
         {
             "region": {"x": 10, "y": 20, "width": 300, "height": 200},
             "display": 2,
+            "include_cursor": True,
             "include_clicks": True,
             "include_audio": True,
         },
@@ -36,8 +40,10 @@ def test_macos_build_command_formats_region_and_flags(tmp_path) -> None:
 
     assert command == [
         "screencapture",
+        "-v",
         "-V",
         "3",
+        "-C",
         "-R",
         "10,20,300,200",
         "-D",
