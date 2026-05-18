@@ -83,13 +83,26 @@ async def start_recording(
     output_path: str | None = None,
     options: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Start recording a target screen.
+    """Start recording a macOS, iOS Simulator, or Android screen target.
 
-    For macOS browser or desktop-app debugging, prefer
-    start_app_window_recording so the target app's visible window is checked and
-    only that window region is recorded. Use target="macos" here only when a
-    full desktop recording is intentionally needed or when options.region is
-    already known. Omitting duration_seconds starts a manual-stop recording.
+    Target aliases:
+    - macOS: "macos", "mac", or "desktop"
+    - iOS Simulator: "ios_simulator", "ios-simulator", "ios", or "simulator"
+    - Android: "android"
+
+    Common options include orientation and rotate_degrees. macOS options include
+    region, display, include_cursor, include_clicks, and include_audio. iOS
+    Simulator options include device, udid, and display ("internal" or
+    "external"). Android options include serial, size, and bit_rate.
+
+    Omit duration_seconds for the preferred manual-stop workflow, then call
+    stop_recording with the returned session_id. The response includes
+    session_id, video_path, target, mode, started_at, pid, and target_key.
+
+    macOS recording requires Screen Recording permission for the launcher
+    process. For browser or desktop-app debugging, prefer
+    start_app_window_recording so the visible app window is checked and only
+    that window region is recorded.
     """
     return await _session.start_recording(
         target, output_path, duration_seconds, options
@@ -98,7 +111,19 @@ async def start_recording(
 
 @mcp.tool()
 async def stop_recording(session_id: str) -> dict[str, Any]:
-    """Stop a running recording session."""
+    """Stop one manual recording session and verify the produced file.
+
+    Call this after start_recording or start_app_window_recording returned a
+    session_id and the UI interaction has finished.
+
+    Always inspect file_exists and file_size_bytes before extracting frames:
+    file_exists must be true and file_size_bytes must be greater than zero.
+    Android sessions may also include pull_returncode from adb file transfer.
+
+    If stopping fails or the file is missing/empty, use list_active_sessions and
+    cleanup_stale_processes before retrying. Permission failures usually require
+    user action in macOS System Settings or on the Android device.
+    """
     return await _session.stop_recording(session_id)
 
 
@@ -106,28 +131,56 @@ async def stop_recording(session_id: str) -> dict[str, Any]:
 async def stop_all_recordings(
     target: str | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
-    """Stop all running recording sessions, optionally filtered by target."""
+    """Stop all live recording sessions for this server process.
+
+    Use this when the client lost a session_id, duplicate-target protection is
+    blocking a new start_recording call, or before starting a fresh verification
+    run where old sessions would confuse results.
+
+    Pass target to filter by target family. Accepted values follow
+    start_recording aliases such as macos, ios_simulator, and android.
+    The response groups stopped session metadata under "stopped".
+    """
     return await _session.stop_all_recordings(target)
 
 
 @mcp.tool()
 async def list_active_sessions() -> dict[str, list[dict[str, Any]]]:
-    """List active recording sessions."""
+    """List recording sessions owned by this running server process.
+
+    This does not discover recordings started by a dead prior server process;
+    use cleanup_stale_processes for that case. The response contains a
+    "sessions" list with session_id, target, target_key, video_path, mode,
+    started_at, duration_seconds, and pid for each active recording.
+    """
     return _session.list_active_sessions()
 
 
 @mcp.tool()
 async def cleanup_stale_processes() -> dict[str, list[dict[str, Any]]]:
-    """Clean up recording processes left by a dead previous server process."""
+    """Clean up recording processes left by dead previous server processes.
+
+    start_recording automatically runs this check before creating a new session,
+    so explicit calls are normally only needed after a stale-process error or
+    after an interrupted client run.
+
+    Cleanup is limited to processes owned by the current OS user. The response
+    reports any killed process/session records under "cleaned".
+    """
     return await _session.cleanup_stale_processes()
 
 
 @mcp.tool()
 async def move_pointer(x: float, y: float) -> dict[str, float]:
-    """Move the macOS pointer without clicking.
+    """Move the macOS pointer to one coordinate without clicking.
 
-    Use this for hover-only desktop checks when Computer Use drag would send a
-    mouse-up and might activate the target.
+    Requires macOS Accessibility permission for the launcher process. Use this
+    for single-point hover-only desktop checks when Computer Use drag would send
+    a mouse-up event and might activate the target.
+
+    For multiple hover/unhover points, prefer hover_sequence because it can
+    activate an app_name first and interpolate movement across segments.
+    The response echoes the final x and y coordinates.
     """
     return move_pointer_once(x, y)
 
@@ -142,10 +195,17 @@ async def hover_sequence(
 ) -> dict[str, Any]:
     """Move the macOS pointer through hover/unhover points without clicking.
 
-    This is the preferred hover-only fallback for canvas-style or inaccessible
-    web pages where Playwright cannot target DOM elements. Pass app_name for
-    browser/app checks so the target app is activated immediately before the
-    hover sequence. It posts only mouse-move events and does not click.
+    This is the preferred hover fallback for canvas-style, WebGL, native, or
+    otherwise inaccessible pages where Playwright cannot target DOM elements.
+    It posts only mouse-move events and does not click.
+
+    Pass app_name to activate the target app immediately before the hover
+    sequence. steps_per_segment controls interpolation density and
+    step_delay_seconds controls the pause between generated points.
+
+    The response includes moved_count and final position fields from pointer
+    movement. When app_name is provided, active_window contains the visibility
+    check result used before moving.
     """
     active_window = None
     if app_name:
@@ -170,9 +230,14 @@ async def get_window_region(
 ) -> dict[str, Any]:
     """Return the visible front-window region for a macOS app.
 
-    Call this before macOS app/browser recording to verify the target window is
-    actually on screen and active. If visible=false, reposition the window
-    before recording.
+    Use this before macOS app or browser recording to verify the target window
+    is on screen, active, and sufficiently visible. The default
+    min_visible_ratio is 0.8; lower it only when partial visibility is
+    intentional.
+
+    The response includes visible, visible_ratio, region, frame, and screen
+    details. If visible is false, reposition or unminimize the window before
+    calling start_app_window_recording.
     """
     return await get_app_window_region(
         app_name,
@@ -193,11 +258,17 @@ async def start_app_window_recording(
 ) -> dict[str, Any]:
     """Start recording only the visible front-window region of a macOS app.
 
-    Preferred for Chrome/Safari/desktop-app debugging. It first activates the
-    target app, verifies the target front window is sufficiently visible, then
+    This is the first choice for Chrome, Safari, and desktop-app debugging. It
+    activates app_name, verifies the front window meets min_visible_ratio, then
     records only that visible region via screencapture -R instead of recording
-    the full desktop. Omitting duration_seconds records until stop_recording is
-    called.
+    the full desktop.
+
+    Omit duration_seconds for the preferred manual-stop workflow, then call
+    stop_recording with the returned session_id. Options are forwarded to the
+    macOS backend after region is injected.
+
+    If visibility validation fails, the response is {"error": ..., "window": ...}
+    so the client can reposition or unminimize the target and retry.
     """
     window_region = await get_app_window_region(
         app_name,
@@ -236,7 +307,20 @@ async def extract_frames(
     inline_images: bool = True,
     rotate_degrees: int | None = None,
 ) -> dict[str, Any]:
-    """Extract key frames from a video."""
+    """Extract key frames or fixed-rate frames from a recorded video.
+
+    mode="scene" selects frames around visual changes and uses scene_threshold
+    to control sensitivity; lower thresholds produce more frames. mode="fixed_fps"
+    samples at fps and should be used when timing matters more than scene
+    changes.
+
+    max_frames limits output size. When more frames are found than allowed, the
+    response reports dropped_for_max. inline_images=True returns FastMCP Image
+    content for clients that can display frames directly.
+
+    rotate_degrees applies orientation normalization when a backend produced a
+    sideways recording. ffmpeg and ffprobe must be available on PATH.
+    """
     return await extract_video_frames(
         video_path,
         output_dir,
@@ -257,7 +341,19 @@ async def record_and_extract(
     options: dict[str, Any] | None = None,
     extract_options: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Record a target for a fixed duration and extract frames in one call."""
+    """Record a target for a fixed duration and extract frames in one call.
+
+    Use this when the recording length is known up front and no interactive
+    manual stop is needed. duration_seconds is required.
+
+    output_dir receives the captured recording file (recording.mov for macOS and
+    iOS Simulator, recording.mp4 for Android) and a frames/ directory containing
+    extracted images.
+
+    options are forwarded to start_recording. extract_options are forwarded to
+    extract_frames, including mode, scene_threshold, fps, max_frames,
+    inline_images, and rotate_degrees.
+    """
     return await _session.record_and_extract(
         target,
         duration_seconds,
