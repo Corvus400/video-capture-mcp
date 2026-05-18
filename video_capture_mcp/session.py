@@ -34,6 +34,7 @@ DEFAULT_CREATE_PROCESS = cast(CreateProcess, asyncio.create_subprocess_exec)
 @dataclass
 class ActiveSession:
     session_id: str
+    session_key: str
     target: str
     started_at: datetime
     video_path: str
@@ -65,6 +66,7 @@ class Session:
         self._run_precheck = run_precheck
         self._sessions: dict[str, ActiveSession] = {}
         self._target_index: dict[str, str] = {}
+        self._start_lock = asyncio.Lock()
         self._registry = ProcessRegistry(registry_dir)
         self._startup_cleanup_done = False
 
@@ -78,57 +80,60 @@ class Session:
         await self.cleanup_stale_processes()
         self._reap_finished_sessions()
         target = _normalize_target(target)
-        existing_id = self._target_index.get(target)
-        if existing_id is not None:
-            return {
-                "error": "already recording",
-                "existing_session_id": existing_id,
-            }
-
-        video_path = (
-            _default_output_path(target)
-            if output_path is None
-            else os.fspath(Path(output_path).expanduser())
-        )
         recording_options = dict(options or {})
-        remote_path = None
-        if target == "android":
-            remote_path = f"/sdcard/video_capture_{uuid.uuid4().hex}.mp4"
-            recording_options["_remote_path"] = remote_path
-        backend = _backend_for_target(target)
-        try:
-            if self._run_precheck:
-                await backend.precheck()
-            argv = backend.build_command(
-                video_path, duration_seconds, recording_options
+        session_key = _session_key(target, recording_options)
+        async with self._start_lock:
+            existing_id = self._target_index.get(session_key)
+            if existing_id is not None:
+                return {
+                    "error": "already recording",
+                    "existing_session_id": existing_id,
+                }
+
+            video_path = (
+                _default_output_path(target)
+                if output_path is None
+                else os.fspath(Path(output_path).expanduser())
             )
-            process = await self._create_process(
-                *argv,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            remote_path = None
+            if target == "android":
+                remote_path = f"/sdcard/video_capture_{uuid.uuid4().hex}.mp4"
+                recording_options["_remote_path"] = remote_path
+            backend = _backend_for_target(target)
+            try:
+                if self._run_precheck:
+                    await backend.precheck()
+                argv = backend.build_command(
+                    video_path, duration_seconds, recording_options
+                )
+                process = await self._create_process(
+                    *argv,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL,
+                )
+            except Exception as exc:
+                return {"error": str(exc), "target": target}
+            mode = "scheduled" if target == "macos" else "manual_stop"
+            session_id = uuid.uuid4().hex
+            active = ActiveSession(
+                session_id=session_id,
+                session_key=session_key,
+                target=target,
+                started_at=datetime.now(timezone.utc),
+                video_path=video_path,
+                mode=mode,
+                process=process,
+                options=recording_options,
+                remote_path=remote_path,
             )
-        except Exception as exc:
-            return {"error": str(exc), "target": target}
-        mode = "scheduled" if target == "macos" else "manual_stop"
-        session_id = uuid.uuid4().hex
-        active = ActiveSession(
-            session_id=session_id,
-            target=target,
-            started_at=datetime.now(timezone.utc),
-            video_path=video_path,
-            mode=mode,
-            process=process,
-            options=recording_options,
-            remote_path=remote_path,
-        )
-        self._sessions[session_id] = active
-        self._target_index[target] = session_id
-        self._write_registry()
-        return {
-            "session_id": session_id,
-            "video_path": video_path,
-            "mode": mode,
-        }
+            self._sessions[session_id] = active
+            self._target_index[session_key] = session_id
+            self._write_registry()
+            return {
+                "session_id": session_id,
+                "video_path": video_path,
+                "mode": mode,
+            }
 
     async def stop_recording(self, session_id: str) -> dict[str, Any]:
         active = self._sessions.get(session_id)
@@ -143,7 +148,8 @@ class Session:
                 android_stop_exit_code = await self._run_command(
                     android.stop_command(active.options)
                 )
-            exit_code = await active.process.wait()
+            await active.process.communicate()
+            exit_code = active.process.returncode
             pull_exit_code = None
             cleanup_exit_code = None
             if active.target == "android" and active.remote_path is not None:
@@ -228,15 +234,16 @@ class Session:
     async def _run_command(self, argv: list[str]) -> int:
         proc = await self._create_process(
             *argv,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
         )
-        return await proc.wait()
+        await proc.communicate()
+        return proc.returncode or 0
 
     def _forget_session(self, active: ActiveSession) -> None:
         self._sessions.pop(active.session_id, None)
-        if self._target_index.get(active.target) == active.session_id:
-            self._target_index.pop(active.target, None)
+        if self._target_index.get(active.session_key) == active.session_id:
+            self._target_index.pop(active.session_key, None)
         self._write_registry()
 
     def _reap_finished_sessions(self) -> None:
@@ -280,6 +287,16 @@ def _backend_for_target(target: str) -> Any:
     if target == "android":
         return android
     raise ValueError(f"unsupported target: {target}")
+
+
+def _session_key(target: str, options: dict[str, Any]) -> str:
+    if target == "ios_simulator":
+        device = options.get("device") or options.get("udid") or "booted"
+        return f"ios_simulator:{device}"
+    if target == "android":
+        serial = options.get("serial") or "default"
+        return f"android:{serial}"
+    return target
 
 
 def _default_output_path(target: str) -> str:

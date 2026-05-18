@@ -102,10 +102,16 @@ async def test_cleanup_dead_android_session_runs_stop_pull_and_cleanup(
         encoding="utf-8",
     )
     commands: list[tuple[str, ...]] = []
+    kwargs_list: list[dict] = []
 
     class FakeProcess:
+        returncode = 0
+
         async def wait(self) -> int:
             return 0
+
+        async def communicate(self) -> tuple[bytes, bytes]:
+            return b"", b""
 
     def fake_kill(pid: int, sig: signal.Signals | int) -> None:
         if pid == 999999:
@@ -113,6 +119,7 @@ async def test_cleanup_dead_android_session_runs_stop_pull_and_cleanup(
 
     async def fake_create_process(*args, **kwargs):
         commands.append(tuple(args))
+        kwargs_list.append(kwargs)
         return FakeProcess()
 
     monkeypatch.setattr(process_registry.os, "kill", fake_kill)
@@ -148,6 +155,11 @@ async def test_cleanup_dead_android_session_runs_stop_pull_and_cleanup(
         "shell",
         "rm",
         "/sdcard/old.mp4",
+    )
+    assert all(
+        kwargs["stdout"] == process_registry.asyncio.subprocess.DEVNULL
+        and kwargs["stderr"] == process_registry.asyncio.subprocess.DEVNULL
+        for kwargs in kwargs_list
     )
 
 

@@ -29,12 +29,14 @@ iOS Simulator options:
 
 - `device` or `udid`: Simulator UDID. Defaults to `booted`.
 - `display`: `internal` or `external`.
+- Different Simulator UDIDs can be recorded at the same time.
 
 Android options:
 
 - `serial`: adb serial.
 - `size`: `WIDTHxHEIGHT`, `{ "width": int, "height": int }`, or `[width, height]`.
 - `bit_rate`: integer bit rate for `adb shell screenrecord`.
+- Different adb serials can be recorded at the same time.
 
 Example:
 
