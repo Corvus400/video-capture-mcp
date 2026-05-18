@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/Corvus400/video-capture-mcp/compare/v0.1.1...v0.2.0) (2026-05-18)
+
+
+### Features
+
+* support manual macOS recording control ([c785323](https://github.com/Corvus400/video-capture-mcp/commit/c78532305fc317576f489e9888f53da20cde3f23))
+
 ## [Unreleased]
 
 ### Added
