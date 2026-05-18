@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
+from video_capture_mcp import __version__
 from video_capture_mcp.extractor import extract_frames as extract_video_frames
 from video_capture_mcp.paths import default_output_root
 from video_capture_mcp.pointer import (
@@ -211,6 +213,9 @@ async def record_and_extract(
 
 
 def main() -> None:
+    if "--version" in sys.argv[1:]:
+        print(__version__)
+        return
     try:
         mcp.run()
     finally:
