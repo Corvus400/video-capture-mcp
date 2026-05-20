@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/Corvus400/video-capture-mcp/compare/v0.4.0...v0.5.0) (2026-05-20)
+
+
+### Features
+
+* **mcp:** guide macOS permission setup for clients ([b927648](https://github.com/Corvus400/video-capture-mcp/commit/b92764837578383b46919f80d35b7ba3b11bba75))
+
 ## [0.4.0](https://github.com/Corvus400/video-capture-mcp/compare/v0.3.0...v0.4.0) (2026-05-18)
 
 
