@@ -114,7 +114,9 @@ See [docs/permissions.md](docs/permissions.md) for full details.
 
 - Screen Recording is required for `start_recording target=macos` and `start_app_window_recording`.
 - Accessibility is required for `move_pointer` and `hover_sequence`.
-- Add the executable that launches the server to System Settings > Privacy & Security. For `uvx` and `pip`, this is usually the Python interpreter for that environment. For Homebrew, it is the installed `video-capture-mcp` executable.
+- This is a macOS TCC requirement and cannot be granted automatically by an MCP server. It is normally a one-time permission for the process that launches the server, not a per-recording step.
+- From Claude Code or Codex, use `check_macos_permissions` when setup is unclear. It reports whether Screen Recording works, the launcher process macOS is evaluating, the System Settings location, and the required MCP client restart.
+- Add the launcher process to System Settings > Privacy & Security > Screen Recording. For `uvx` and `pip`, this is usually the Python interpreter for that environment. For Homebrew, it is the installed `video-capture-mcp` executable.
 
 ## Quickstart (Claude Code)
 
@@ -159,6 +161,7 @@ See [docs/permissions.md](docs/permissions.md) for full details.
 | `record_and_extract` | Record and extract in one call | `target`, `duration_seconds`, `output_dir` |
 | `list_active_sessions` | List current recordings | none |
 | `cleanup_stale_processes` | Reap recordings from dead previous server PIDs | none |
+| `check_macos_permissions` | Diagnose macOS Screen Recording permission and setup guidance | none |
 
 Detailed parameters and option schemas are in [docs/tools.md](docs/tools.md).
 

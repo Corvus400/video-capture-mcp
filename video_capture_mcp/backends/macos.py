@@ -14,6 +14,12 @@ class BackendError(RuntimeError):
 
 
 async def precheck() -> None:
+    diagnosis = await diagnose_screen_recording()
+    if not diagnosis["ok"]:
+        raise BackendError(_format_tcc_error(diagnosis))
+
+
+async def diagnose_screen_recording() -> dict[str, Any]:
     probe_path = (
         Path(tempfile.gettempdir()) / f"_video_capture_tcc_probe_{uuid.uuid4().hex}.mov"
     )
@@ -32,15 +38,49 @@ async def precheck() -> None:
     except OSError:
         pass
 
-    if proc.returncode != 0 or size == 0:
-        python_path = sys.executable
-        message = stderr.decode("utf-8", errors="replace").strip()
-        raise BackendError(
-            "TCC permission required for "
-            f"{python_path}. Open System Settings > Privacy & Security > "
-            "Screen Recording and add this Python binary. "
-            f"screencapture stderr: {message}"
-        )
+    ok = proc.returncode == 0 and size > 0
+    message = stderr.decode("utf-8", errors="replace").strip()
+    settings_path = "System Settings > Privacy & Security > Screen Recording"
+    launcher_process = sys.executable
+    restart_hint = (
+        "After changing the permission, fully restart the MCP client so macOS "
+        "reloads the TCC decision."
+    )
+    user_message = (
+        "macOS recording needs Screen Recording permission. This is a macOS TCC "
+        "requirement, so video-capture-mcp cannot grant it automatically. Open "
+        f"{settings_path}, grant permission to the launcher process for this MCP "
+        f"server ({launcher_process}), then fully restart Claude Code or Codex. "
+        "This is normally a one-time setup step, not something you repeat for "
+        "every recording."
+    )
+    return {
+        "ok": ok,
+        "required_permission": "Screen Recording",
+        "settings_path": settings_path,
+        "launcher_process": launcher_process,
+        "launcher_hint": (
+            "Grant Screen Recording to the process that launches the MCP server. "
+            "For Claude Code or Codex uvx registrations, this is usually the "
+            "Python interpreter used by uvx."
+        ),
+        "restart_required": True,
+        "restart_hint": restart_hint,
+        "user_message": user_message,
+        "screencapture_returncode": proc.returncode,
+        "probe_file_size_bytes": size,
+        "screencapture_stderr": message,
+    }
+
+
+def _format_tcc_error(diagnosis: dict[str, Any]) -> str:
+    return (
+        "macOS TCC permission required: grant Screen Recording to the launcher "
+        f"process for this MCP server. Settings: {diagnosis['settings_path']}. "
+        f"Detected launcher process: {diagnosis['launcher_process']}. "
+        f"{diagnosis['restart_hint']} "
+        f"screencapture stderr: {diagnosis['screencapture_stderr']}"
+    )
 
 
 def build_command(

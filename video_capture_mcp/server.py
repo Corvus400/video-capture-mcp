@@ -8,6 +8,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from video_capture_mcp import __version__
+from video_capture_mcp.backends import macos
 from video_capture_mcp.extractor import extract_frames as extract_video_frames
 from video_capture_mcp.paths import default_output_root
 from video_capture_mcp.pointer import (
@@ -49,11 +50,14 @@ android -> adb shell screenrecord
 - cleanup_stale_processes reaps recordings owned by dead prior server PIDs (current OS user only). The server auto-runs this before each start_recording, but call it explicitly if start fails with stale-process errors.
 
 # Permissions (macOS only; required before first use)
-- Screen Recording: required for target=macos and start_app_window_recording. System Settings -> Privacy & Security -> Screen Recording -> add the launcher process -> fully restart the MCP client.
+- When the user asks for setup help or asks whether System Settings is necessary, explain this naturally: macOS recording needs Screen Recording permission because of macOS TCC. The MCP server cannot grant it automatically. It is normally a one-time setup for the launcher process, then the user must fully restart Claude Code or Codex.
+- Screen Recording: required for target=macos and start_app_window_recording because macOS TCC requires user approval. System Settings -> Privacy & Security -> Screen Recording -> add the launcher process for this MCP server -> fully restart the MCP client.
 - Accessibility: required for move_pointer and hover_sequence. Same flow under Accessibility -> add the launcher process -> fully restart the MCP client.
 - iOS Simulator and Android do NOT need Screen Recording (they use xcrun simctl / adb).
 - ffmpeg and ffprobe must be on PATH for extract_frames and orientation normalization. Install with `brew install ffmpeg`.
 - If you need to know which binary to add: for uvx run `uvx --from video-capture-mcp python -c "import sys; print(sys.executable)"`; for pip or Homebrew use `which video-capture-mcp` (then realpath the result).
+- If the user asks whether System Settings is necessary, answer yes for macOS recording: it is a macOS TCC constraint, not something the MCP server can auto-grant. It is normally a one-time permission for the launcher process, not a per-recording step.
+- Use check_macos_permissions to confirm Screen Recording status and return client-facing setup guidance before retrying macOS recording. If it returns user_message, surface that message to the user instead of asking them to run Python directly.
 - If a recording or pointer tool fails with TCC denial, the agent cannot self-recover; surface the error to the user with the System Settings path.
 
 # Output paths
@@ -80,6 +84,34 @@ android -> adb shell screenrecord
 
 mcp = FastMCP("video_capture", instructions=SERVER_INSTRUCTIONS)
 _session = Session()
+
+
+@mcp.tool()
+async def check_macos_permissions() -> dict[str, Any]:
+    """Diagnose macOS Screen Recording permission for Claude Code/Codex users.
+
+    Use this before retrying `start_recording target="macos"` or
+    `start_app_window_recording` when macOS TCC may be blocking capture. The
+    response tells the client whether Screen Recording currently works, which
+    launcher process macOS is evaluating, where the user must grant permission,
+    and that the MCP client must be fully restarted after changing the setting.
+    Surface `user_message` directly when explaining the setup to the user.
+
+    This tool only checks Screen Recording. iOS Simulator and Android recordings
+    do not need Screen Recording. Pointer tools (`move_pointer` and
+    `hover_sequence`) need Accessibility permission instead.
+    """
+    diagnosis = await macos.diagnose_screen_recording()
+    return {
+        **diagnosis,
+        "client_guidance": (
+            "For Claude Code or Codex, the user usually should not call Python "
+            "directly. Ask them to grant Screen Recording to the launcher process "
+            "shown here, then fully restart the MCP client."
+        ),
+        "ios_android_screen_recording_required": False,
+        "pointer_tools_permission": "Accessibility",
+    }
 
 
 @mcp.tool()

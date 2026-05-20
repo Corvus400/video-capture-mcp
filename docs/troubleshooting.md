@@ -10,10 +10,18 @@ TCC permission required
 
 Fix:
 
-1. Open System Settings > Privacy & Security > Screen Recording.
-2. Add or enable the launcher process described in [permissions.md](permissions.md).
-3. Restart the MCP client.
-4. Retry `start_recording target=macos` or `start_app_window_recording`.
+This permission is required by macOS TCC for macOS recording. The MCP server
+cannot grant it automatically.
+
+1. In Claude Code or Codex, call `check_macos_permissions` if you need to know
+   which launcher process macOS is evaluating.
+2. Open System Settings > Privacy & Security > Screen Recording.
+3. Add or enable the launcher process described in [permissions.md](permissions.md).
+4. Fully restart the MCP client so macOS reloads the TCC decision.
+5. Retry `start_recording target=macos` or `start_app_window_recording`.
+
+This is normally a one-time setup step for the launcher process, not something
+that must be repeated for every recording.
 
 For pointer tools, repeat the same flow under Accessibility.
 
