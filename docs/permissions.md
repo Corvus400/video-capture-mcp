@@ -2,6 +2,10 @@
 
 `video-capture-mcp` launches native recording and pointer APIs from the process that starts the MCP server. macOS grants Screen Recording and Accessibility permission to that launcher, not to the repository.
 
+For Claude Code and Codex users, this usually means the user does not run Python
+directly. The MCP client starts the server, and macOS evaluates the launcher
+process used by that registration.
+
 ## Screen Recording
 
 Required for:
@@ -9,7 +13,16 @@ Required for:
 - `start_recording` with `target="macos"`
 - `start_app_window_recording`
 
+This is required by macOS TCC and cannot be auto-granted by the MCP server. It is
+normally a one-time permission for the launcher process, not a per-recording
+step.
+
 Open System Settings > Privacy & Security > Screen Recording, then add the executable that starts the MCP server.
+
+From Claude Code or Codex, call `check_macos_permissions` when setup is unclear.
+It returns whether the current launcher can record, the detected launcher
+process, the System Settings path, and whether a full MCP client restart is
+required.
 
 For macOS 14, 15, and 26, the flow is the same:
 
@@ -25,6 +38,11 @@ Install-route guidance:
 - `pip`: add the Python interpreter or console script environment where `video-capture-mcp` is installed. `python -c "import sys; print(sys.executable)"` prints the interpreter path.
 - Homebrew: add the `video-capture-mcp` executable reported by `which video-capture-mcp`.
 - From source: add `.venv/bin/python` from the cloned checkout.
+
+Backend exceptions:
+
+- iOS Simulator recording does not require Screen Recording.
+- Android recording does not require Screen Recording.
 
 ## Accessibility
 

@@ -63,6 +63,10 @@ Returns:
 }
 ```
 
+macOS recordings require Screen Recording permission. If macOS TCC blocks
+capture, call `check_macos_permissions` for Claude Code/Codex-facing setup
+guidance before retrying.
+
 ## `stop_recording`
 
 Stop a running session.
@@ -207,5 +211,28 @@ Clean up recording processes left by a dead previous server process.
 Parameters: none.
 
 The server also calls this before starting a recording. It only acts on registry files owned by the current OS user.
+
+## `check_macos_permissions`
+
+Diagnose macOS Screen Recording permission for the current MCP launcher process.
+
+Parameters: none.
+
+Returns:
+
+```json
+{
+  "ok": false,
+  "required_permission": "Screen Recording",
+  "settings_path": "System Settings > Privacy & Security > Screen Recording",
+  "launcher_process": "...",
+  "restart_required": true
+}
+```
+
+Use this from Claude Code or Codex when a macOS recording fails with TCC denial,
+or before asking a user to change System Settings. iOS Simulator and Android
+recording do not require Screen Recording. Pointer tools require Accessibility
+instead.
 
 > Tool descriptions in `video_capture_mcp/server.py` mirror this file. Update both when changing parameters, options, or return shapes.

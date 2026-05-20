@@ -64,6 +64,11 @@
       "name": "cleanup_stale_processes",
       "description": "Clean up stale recordings from dead previous server processes.",
       "arguments": []
+    },
+    {
+      "name": "check_macos_permissions",
+      "description": "Diagnose macOS Screen Recording permission and Claude Code/Codex setup guidance.",
+      "arguments": []
     }
   ]
 }
