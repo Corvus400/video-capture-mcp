@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/Corvus400/video-capture-mcp/compare/v0.5.0...v0.5.1) (2026-05-25)
+
+
+### Documentation
+
+* **readme:** clarify uvx quickstart setup ([#20](https://github.com/Corvus400/video-capture-mcp/issues/20)) ([327bd50](https://github.com/Corvus400/video-capture-mcp/commit/327bd509d001be6668e409290ce0d1eca56788d2))
+
 ## [0.5.0](https://github.com/Corvus400/video-capture-mcp/compare/v0.4.0...v0.5.0) (2026-05-20)
 
 
