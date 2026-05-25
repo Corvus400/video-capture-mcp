@@ -23,13 +23,18 @@
 
 - macOS 12 or newer.
 - Python 3.11 or 3.12 for PyPI and `uvx` installs. Homebrew installs its own Python dependency.
+- `uv` for the `uvx` install method (Option 1), which provides the `uvx` command. Option 2 (pip, standard CPython pip) and Option 3 (Homebrew) do not require uv. See the [Quickstart](#quickstart-claude-code) for the install command, or the [uv installation docs](https://docs.astral.sh/uv/getting-started/installation/).
 - `ffmpeg` and `ffprobe`.
 - Xcode Command Line Tools for iOS Simulator recording.
 - Android platform-tools and `adb` for Android recording.
 
 ## Installation
 
+You do **not** need to clone this repository. Pick one install method below. New to MCP? Follow the numbered [Quickstart](#quickstart-claude-code) instead: it walks through uv, ffmpeg, registration, and macOS permissions in order.
+
 ### Option 1: uvx (zero install) [Recommended]
+
+`uvx` is bundled with `uv`. If `uv` is not installed yet, see [Quickstart step 1](#quickstart-claude-code). Then register the server:
 
 Claude Code:
 
@@ -108,31 +113,36 @@ command = "video-capture-mcp"
 args = []
 ```
 
-## macOS Permissions
-
-See [docs/permissions.md](docs/permissions.md) for full details.
-
-- Screen Recording is required for `start_recording target=macos` and `start_app_window_recording`.
-- Accessibility is required for `move_pointer` and `hover_sequence`.
-- This is a macOS TCC requirement and cannot be granted automatically by an MCP server. It is normally a one-time permission for the process that launches the server, not a per-recording step.
-- From Claude Code or Codex, use `check_macos_permissions` when setup is unclear. It reports whether Screen Recording works, the launcher process macOS is evaluating, the System Settings location, and the required MCP client restart.
-- Add the launcher process to System Settings > Privacy & Security > Screen Recording. For `uvx` and `pip`, this is usually the Python interpreter for that environment. For Homebrew, it is the installed `video-capture-mcp` executable.
-
 ## Quickstart (Claude Code)
 
-1. Install `ffmpeg`.
+1. Install `uv`.
+
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   # or: brew install uv
+   ```
+
+   `uvx` (used below) ships with `uv`.
+
+2. Install `ffmpeg`.
 
    ```bash
    brew install ffmpeg
    ```
 
-2. Register the MCP server.
+3. Register the MCP server.
 
    ```bash
    claude mcp add --scope user --transport stdio video_capture -- uvx video-capture-mcp
    ```
 
-3. Ask Claude Code to start recording a visible app window:
+4. Grant macOS Screen Recording permission.
+
+   Recording requires Screen Recording permission. See the [macOS Permissions](#macos-permissions) section just below for the exact steps, and run `check_macos_permissions` from the agent if you are unsure which process to add.
+
+5. Record.
+
+   Ask Claude Code to start recording a visible app window:
 
    ```json
    {
@@ -143,8 +153,18 @@ See [docs/permissions.md](docs/permissions.md) for full details.
    }
    ```
 
-4. Have the agent operate the UI, then call `mcp__video_capture__stop_recording`
+   Have the agent operate the UI, then call `mcp__video_capture__stop_recording`
    with the returned `session_id`.
+
+## macOS Permissions
+
+See [docs/permissions.md](docs/permissions.md) for full details.
+
+- Screen Recording is required for `start_recording target=macos` and `start_app_window_recording`.
+- Accessibility is required for `move_pointer` and `hover_sequence`.
+- This is a macOS TCC requirement and cannot be granted automatically by an MCP server. It is normally a one-time permission for the process that launches the server, not a per-recording step.
+- From Claude Code or Codex, use `check_macos_permissions` when setup is unclear. It reports whether Screen Recording works, the launcher process macOS is evaluating, the System Settings location, and the required MCP client restart.
+- Add the launcher process to System Settings > Privacy & Security > Screen Recording. For `uvx` and `pip`, this is usually the Python interpreter for that environment. For Homebrew, it is the installed `video-capture-mcp` executable.
 
 ## Tools
 
