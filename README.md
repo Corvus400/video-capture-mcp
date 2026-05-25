@@ -23,13 +23,18 @@
 
 - macOS 12 or newer.
 - Python 3.11 or 3.12 for PyPI and `uvx` installs. Homebrew installs its own Python dependency.
+- `uv` for the `uvx` install method (Option 1), which provides the `uvx` command. Option 2 (pip, standard CPython pip) and Option 3 (Homebrew) do not require uv. See the [Quickstart](#quickstart-claude-code) for the install command, or the [uv installation docs](https://docs.astral.sh/uv/getting-started/installation/).
 - `ffmpeg` and `ffprobe`.
 - Xcode Command Line Tools for iOS Simulator recording.
 - Android platform-tools and `adb` for Android recording.
 
 ## Installation
 
+You do **not** need to clone this repository. Pick one install method below. New to MCP? Follow the numbered [Quickstart](#quickstart-claude-code) instead: it walks through uv, ffmpeg, registration, and macOS permissions in order.
+
 ### Option 1: uvx (zero install) [Recommended]
+
+`uvx` is bundled with `uv`. If `uv` is not installed yet, see [Quickstart step 1](#quickstart-claude-code). Then register the server:
 
 Claude Code:
 
